@@ -1,5 +1,4 @@
-import { DEFAULT_ROUTER_CONFIG } from '@mindpool/shared';
-import type { ChatMessage } from '@mindpool/shared';
+import type { ChatMessage, RouterConfig } from '@mindpool/shared';
 import { LLMRouter } from '../llm/router';
 import { KimiProvider, MinimaxProvider } from '../llm/providers';
 import { QueueManager } from '../queue/QueueManager';
@@ -8,8 +7,13 @@ import { config } from '../config';
 import { Pool, Agent, Message } from '../models';
 import * as poolService from './pool.service';
 
-// Initialize LLM router
-const llmRouter = new LLMRouter(DEFAULT_ROUTER_CONFIG);
+// Initialize LLM router from env config
+const routerConfig: RouterConfig = {
+  full_response: config.llmRouting.fullResponse,
+  relevance_check: config.llmRouting.relevanceCheck,
+  recap_synthesis: config.llmRouting.recapSynthesis,
+};
+const llmRouter = new LLMRouter(routerConfig);
 
 if (config.kimiApiKey) {
   llmRouter.registerProvider(new KimiProvider(config.kimiApiKey));

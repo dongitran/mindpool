@@ -17,8 +17,3 @@ export interface ChatOptions {
   stream?: boolean;
 }
 
-export const DEFAULT_ROUTER_CONFIG: RouterConfig = {
-  full_response: { provider: 'kimi', model: 'kimi-k2' },
-  relevance_check: { provider: 'minimax', model: 'MiniMax-M2.5' },
-  recap_synthesis: { provider: 'minimax', model: 'MiniMax-Text-01' },
-};
