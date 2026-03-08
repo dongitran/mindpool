@@ -1,0 +1,1380 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Mindpool — Every perspective. One room.</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Sora:wght@300;400;500;600;700&family=DM+Serif+Display:ital@0;1&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg:#080810;--surface-1:#0f0f1a;--surface-2:#161624;--surface-3:#1e1e30;
+  --border:#252538;--border-light:#2e2e48;
+  --accent:#3dffc0;--accent-dim:rgba(61,255,192,0.12);--accent-glow:rgba(61,255,192,0.25);
+  --purple:#8b7cf8;--purple-dim:rgba(139,124,248,0.12);
+  --amber:#ffc46b;--amber-dim:rgba(255,196,107,0.12);
+  --red:#ff6b6b;
+  --text:#e4e4f4;--text-muted:#6b6b90;--text-dim:#3a3a58;
+  --sidebar-w:288px;--radius:12px;--radius-sm:8px;--radius-xs:6px;
+}
+*{margin:0;padding:0;box-sizing:border-box;}
+body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--text);height:100vh;overflow:hidden;display:flex;}
+
+/* ── SIDEBAR ── */
+.sidebar{width:var(--sidebar-w);flex-shrink:0;background:var(--surface-1);border-right:1px solid var(--border);display:flex;flex-direction:column;height:100vh;overflow:hidden;}
+.sidebar-top{padding:18px 14px 14px;border-bottom:1px solid var(--border);flex-shrink:0;}
+.logo{display:flex;align-items:center;gap:10px;margin-bottom:14px;cursor:pointer;}
+.logo-icon{width:30px;height:30px;background:linear-gradient(135deg,var(--accent),var(--purple));border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:15px;}
+.logo-text{font-family:'DM Serif Display',serif;font-size:19px;background:linear-gradient(135deg,var(--accent),var(--purple));-webkit-background-clip:text;-webkit-text-fill-color:transparent;}
+.new-pool-btn{width:100%;padding:9px 14px;background:var(--accent-dim);border:1px solid rgba(61,255,192,0.22);border-radius:var(--radius-sm);color:var(--accent);font-family:'Sora',sans-serif;font-size:13px;font-weight:600;cursor:pointer;display:flex;align-items:center;gap:8px;transition:all .15s;}
+.new-pool-btn:hover{background:rgba(61,255,192,0.18);border-color:rgba(61,255,192,0.38);}
+
+/* sidebar scroll area */
+.sidebar-body{flex:1;overflow-y:auto;padding:0 8px 16px;}
+.sidebar-body::-webkit-scrollbar{width:3px;}
+.sidebar-body::-webkit-scrollbar-thumb{background:var(--border);border-radius:2px;}
+
+.sb-section{padding:14px 8px 6px;font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:1.2px;color:var(--text-dim);}
+
+/* ── MEETINGS in sidebar ── */
+.meeting-item{display:flex;align-items:center;gap:10px;padding:9px 10px;border-radius:var(--radius-sm);cursor:pointer;transition:background .12s;margin-bottom:2px;}
+.meeting-item:hover{background:var(--surface-2);}
+.meeting-item.active{background:var(--surface-3);}
+.meeting-dot{width:7px;height:7px;border-radius:50%;flex-shrink:0;}
+.meeting-dot.live{background:var(--accent);animation:pulse 2s infinite;}
+.meeting-dot.done{background:var(--amber);}
+.meeting-dot.archived{background:var(--text-dim);}
+@keyframes pulse{0%,100%{opacity:1;}50%{opacity:.35;}}
+.meeting-item-info{flex:1;min-width:0;}
+.meeting-item-title{font-size:12.5px;font-weight:500;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.meeting-item-meta{font-size:10.5px;color:var(--text-muted);margin-top:1px;}
+
+.sb-divider{height:1px;background:var(--border);margin:8px 4px;}
+
+/* ── CONVERSATIONS in sidebar ── */
+.conv-item{padding:9px 10px;border-radius:var(--radius-sm);cursor:pointer;transition:background .12s;margin-bottom:2px;}
+.conv-item:hover{background:var(--surface-2);}
+.conv-item.active{background:var(--surface-3);}
+.conv-title{font-size:12.5px;font-weight:400;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-bottom:3px;}
+.conv-meta{font-size:10.5px;color:var(--text-muted);}
+/* mini meeting chips inside conv */
+.conv-meetings{margin-top:6px;display:flex;flex-direction:column;gap:4px;}
+.conv-meeting-chip{padding:5px 9px;background:var(--surface-3);border:1px solid var(--border-light);border-radius:6px;cursor:pointer;transition:all .15s;display:flex;align-items:center;gap:6px;}
+.conv-meeting-chip:hover{border-color:var(--accent);background:var(--accent-dim);}
+.conv-chip-dot{width:5px;height:5px;border-radius:50%;flex-shrink:0;}
+.conv-chip-text{font-size:11px;color:var(--text-muted);flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.conv-chip-arrow{font-size:10px;color:var(--text-dim);}
+
+/* ── MAIN ── */
+.main{flex:1;display:flex;flex-direction:column;overflow:hidden;}
+.screen{display:none;flex:1;flex-direction:column;overflow:hidden;height:100vh;}
+.screen.active{display:flex;}
+
+/* ══ WELCOME SCREEN ══ */
+.welcome-wrap{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:40px;position:relative;overflow-y:auto;}
+.welcome-glow{position:absolute;width:600px;height:600px;background:radial-gradient(circle,rgba(61,255,192,0.05) 0%,transparent 70%);pointer-events:none;}
+.welcome-logo{font-size:52px;margin-bottom:20px;filter:drop-shadow(0 0 24px rgba(61,255,192,0.3));}
+.welcome-title{font-family:'DM Serif Display',serif;font-size:36px;text-align:center;margin-bottom:10px;letter-spacing:-.5px;}
+.welcome-title span{background:linear-gradient(135deg,var(--accent),var(--purple));-webkit-background-clip:text;-webkit-text-fill-color:transparent;}
+.welcome-sub{font-size:15px;color:var(--text-muted);text-align:center;max-width:420px;line-height:1.7;margin-bottom:36px;}
+.welcome-cta{padding:13px 28px;background:linear-gradient(135deg,var(--accent),#2de8a8);border:none;border-radius:var(--radius-sm);color:var(--bg);font-family:'Sora',sans-serif;font-size:14px;font-weight:700;cursor:pointer;display:flex;align-items:center;gap:8px;transition:all .2s;letter-spacing:.2px;}
+.welcome-cta:hover{transform:translateY(-2px);box-shadow:0 10px 30px rgba(61,255,192,0.3);}
+.welcome-features{display:flex;gap:16px;margin-top:48px;flex-wrap:wrap;justify-content:center;}
+.feat-card{padding:16px 20px;background:var(--surface-1);border:1px solid var(--border);border-radius:var(--radius);width:180px;text-align:center;transition:all .2s;cursor:default;}
+.feat-card:hover{border-color:var(--border-light);transform:translateY(-2px);}
+.feat-icon{font-size:24px;margin-bottom:8px;}
+.feat-title{font-size:12px;font-weight:600;color:var(--text);margin-bottom:4px;}
+.feat-desc{font-size:11px;color:var(--text-muted);line-height:1.5;}
+.welcome-recent{margin-top:48px;width:100%;max-width:520px;}
+.welcome-recent-title{font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:1px;color:var(--text-dim);margin-bottom:12px;text-align:left;}
+.recent-row{display:flex;gap:10px;flex-wrap:wrap;}
+.recent-pill{padding:7px 14px;background:var(--surface-2);border:1px solid var(--border);border-radius:99px;font-size:12px;color:var(--text-muted);cursor:pointer;transition:all .15s;display:flex;align-items:center;gap:6px;}
+.recent-pill:hover{border-color:var(--border-light);color:var(--text);}
+
+/* ══ CHAT HEADER ══ */
+.chat-header{padding:14px 22px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;flex-shrink:0;}
+.chat-header-title{font-size:14px;font-weight:600;}
+.chat-header-sub{font-size:11px;color:var(--text-muted);margin-top:1px;}
+.tag{padding:2px 9px;border-radius:99px;font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:.5px;}
+.tag-green{background:rgba(61,255,192,.1);color:var(--accent);border:1px solid rgba(61,255,192,.25);}
+.tag-amber{background:var(--amber-dim);color:var(--amber);border:1px solid rgba(255,196,107,.25);}
+.tag-purple{background:var(--purple-dim);color:var(--purple);border:1px solid rgba(139,124,248,.25);}
+
+/* ══ CHAT MESSAGES ══ */
+.chat-messages{flex:1;overflow-y:auto;padding:22px 0;}
+.chat-messages::-webkit-scrollbar{width:3px;}
+.chat-messages::-webkit-scrollbar-thumb{background:var(--border);}
+.msg-row{padding:4px 22px;display:flex;gap:12px;animation:msgIn .25s ease;}
+@keyframes msgIn{from{opacity:0;transform:translateY(8px);}to{opacity:1;transform:translateY(0);}}
+.msg-row.user{justify-content:flex-end;}
+.msg-avatar{width:28px;height:28px;border-radius:50%;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:13px;margin-top:2px;}
+.msg-avatar.bot{background:linear-gradient(135deg,var(--accent),var(--purple));}
+.msg-avatar.user-av{background:var(--surface-3);border:1px solid var(--border-light);color:var(--text-muted);font-size:10px;font-weight:700;}
+.msg-content{max-width:520px;}
+.msg-bubble{padding:11px 15px;border-radius:14px;font-size:13.5px;line-height:1.65;}
+.msg-bubble.bot{background:var(--surface-2);border:1px solid var(--border);border-top-left-radius:4px;color:var(--text);}
+.msg-bubble.user{background:var(--accent-dim);border:1px solid rgba(61,255,192,.2);border-top-right-radius:4px;color:var(--text);}
+.msg-time{font-size:10px;color:var(--text-dim);margin-top:4px;padding:0 3px;}
+.msg-row.user .msg-time{text-align:right;}
+
+/* agent suggestions */
+.agent-suggestions{margin-top:11px;display:flex;flex-direction:column;gap:5px;}
+.agent-suggest-row{display:flex;align-items:center;gap:9px;padding:8px 11px;background:var(--surface-3);border:1px solid var(--border-light);border-radius:var(--radius-sm);transition:all .15s;}
+.agent-suggest-row.checked{border-color:rgba(61,255,192,.3);background:var(--accent-dim);}
+.agent-check{width:17px;height:17px;border-radius:5px;border:1.5px solid var(--border-light);display:flex;align-items:center;justify-content:center;font-size:9px;flex-shrink:0;cursor:pointer;transition:all .15s;}
+.agent-check.on{background:var(--accent);border-color:var(--accent);color:var(--bg);}
+.agent-emoji{font-size:15px;}
+.agent-suggest-info{flex:1;}
+.agent-suggest-name{font-size:12.5px;font-weight:600;color:var(--text);}
+.agent-suggest-desc{font-size:10.5px;color:var(--text-muted);margin-top:1px;}
+.start-meeting-btn{margin-top:13px;width:100%;padding:11px 18px;background:linear-gradient(135deg,var(--accent),#2de8a8);border:none;border-radius:var(--radius-sm);color:var(--bg);font-family:'Sora',sans-serif;font-size:13.5px;font-weight:700;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:8px;transition:all .2s;}
+.start-meeting-btn:hover{transform:translateY(-1px);box-shadow:0 8px 24px rgba(61,255,192,.3);}
+.start-meeting-btn.created{background:var(--surface-3);color:var(--accent);border:1px solid rgba(61,255,192,.3);transform:none;box-shadow:none;cursor:default;}
+
+/* created meeting card */
+.created-meeting-card{margin-top:11px;padding:13px 15px;background:var(--surface-3);border:1px solid rgba(61,255,192,.25);border-radius:var(--radius);position:relative;overflow:hidden;}
+.created-meeting-card::before{content:'';position:absolute;top:0;left:0;width:3px;height:100%;background:var(--accent);}
+.cmc-header{display:flex;align-items:center;gap:8px;margin-bottom:7px;}
+.cmc-badge{font-size:9.5px;font-weight:700;padding:2px 8px;background:var(--accent-dim);border:1px solid rgba(61,255,192,.3);color:var(--accent);border-radius:99px;text-transform:uppercase;letter-spacing:.5px;}
+.cmc-title{font-size:13.5px;font-weight:600;color:var(--text);margin-bottom:7px;}
+.agent-badges{display:flex;gap:5px;flex-wrap:wrap;margin-bottom:10px;}
+.agent-badge{padding:3px 9px;background:var(--surface-2);border:1px solid var(--border-light);border-radius:99px;font-size:10.5px;color:var(--text-muted);display:flex;align-items:center;gap:4px;}
+.goto-btn{padding:7px 15px;background:var(--accent-dim);border:1px solid rgba(61,255,192,.3);border-radius:var(--radius-xs);color:var(--accent);font-family:'Sora',sans-serif;font-size:12.5px;font-weight:600;cursor:pointer;display:inline-flex;align-items:center;gap:6px;transition:all .15s;}
+.goto-btn:hover{background:rgba(61,255,192,.18);}
+
+/* chat input */
+.chat-input-area{padding:14px 22px 18px;border-top:1px solid var(--border);flex-shrink:0;}
+.chat-input-wrap{display:flex;align-items:flex-end;gap:9px;padding:10px 14px;background:var(--surface-2);border:1px solid var(--border-light);border-radius:var(--radius);transition:border-color .15s;}
+.chat-input-wrap:focus-within{border-color:rgba(61,255,192,.4);}
+.chat-input{flex:1;background:none;border:none;outline:none;color:var(--text);font-family:'Sora',sans-serif;font-size:13.5px;resize:none;line-height:1.5;max-height:120px;overflow-y:auto;}
+.chat-input::placeholder{color:var(--text-muted);}
+.send-btn{width:30px;height:30px;background:var(--accent);border:none;border-radius:7px;color:var(--bg);cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0;transition:all .15s;font-size:14px;}
+.send-btn:hover{transform:scale(1.06);}
+
+/* ══ MEETING ROOM ══ */
+.meeting-topbar{padding:12px 18px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:14px;flex-shrink:0;background:var(--surface-1);}
+.back-btn{padding:5px 11px;background:var(--surface-2);border:1px solid var(--border);border-radius:var(--radius-xs);color:var(--text-muted);font-family:'Sora',sans-serif;font-size:11.5px;cursor:pointer;display:flex;align-items:center;gap:5px;transition:all .15s;}
+.back-btn:hover{color:var(--text);border-color:var(--border-light);}
+.meeting-title-area{flex:1;}
+.meeting-title{font-size:14.5px;font-weight:600;color:var(--text);}
+.meeting-status{display:flex;align-items:center;gap:5px;margin-top:2px;}
+.status-dot{width:6px;height:6px;background:var(--accent);border-radius:50%;animation:pulse 2s infinite;}
+.status-text{font-size:11px;color:var(--text-muted);}
+.view-tabs{display:flex;gap:3px;padding:3px;background:var(--surface-2);border:1px solid var(--border);border-radius:var(--radius-sm);}
+.view-tab{padding:5px 11px;border-radius:6px;font-size:11.5px;font-weight:500;cursor:pointer;transition:all .15s;color:var(--text-muted);display:flex;align-items:center;gap:4px;border:none;background:none;font-family:'Sora',sans-serif;}
+.view-tab.active{background:var(--surface-3);color:var(--text);}
+
+.meeting-body{flex:1;display:flex;overflow:hidden;}
+
+/* agents panel */
+.agents-panel{width:210px;flex-shrink:0;border-right:1px solid var(--border);padding:14px 10px;overflow-y:auto;background:var(--surface-1);}
+.agents-panel-title{font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:1.2px;color:var(--text-dim);margin-bottom:9px;padding:0 3px;}
+.agent-card{padding:9px 9px;border-radius:var(--radius-sm);margin-bottom:4px;border:1px solid transparent;transition:all .15s;cursor:pointer;}
+.agent-card.speaking{background:var(--accent-dim);border-color:rgba(61,255,192,.25);}
+.agent-card.queued{background:var(--purple-dim);border-color:rgba(139,124,248,.2);}
+.agent-card.listening{background:var(--surface-2);}
+.agent-card.moderating{background:rgba(61,255,192,.06);border-color:rgba(61,255,192,.18);}
+.badge-moderating{background:rgba(61,255,192,.1);color:var(--accent);border:1px solid rgba(61,255,192,.25);}
+.agent-card-row{display:flex;align-items:center;gap:7px;}
+.agent-icon{font-size:17px;width:26px;text-align:center;flex-shrink:0;}
+.agent-info{flex:1;min-width:0;}
+.agent-name{font-size:11.5px;font-weight:600;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.agent-role{font-size:10px;color:var(--text-muted);margin-top:1px;}
+.agent-status-badge{font-size:9px;padding:2px 6px;border-radius:99px;font-weight:600;flex-shrink:0;display:flex;align-items:center;gap:3px;}
+.badge-speaking{background:var(--accent-dim);color:var(--accent);border:1px solid rgba(61,255,192,.3);}
+.badge-queued{background:var(--purple-dim);color:var(--purple);border:1px solid rgba(139,124,248,.25);}
+.badge-listening{background:var(--surface-3);color:var(--text-muted);border:1px solid var(--border);}
+.queue-order{width:15px;height:15px;background:var(--purple);border-radius:50%;font-size:8px;font-weight:700;color:white;display:flex;align-items:center;justify-content:center;flex-shrink:0;}
+.add-agent-btn{width:100%;padding:7px;background:none;border:1px dashed var(--border-light);border-radius:var(--radius-sm);color:var(--text-muted);font-family:'Sora',sans-serif;font-size:11.5px;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:5px;margin-top:7px;transition:all .15s;}
+.add-agent-btn:hover{border-color:var(--accent);color:var(--accent);}
+
+/* speaking wave */
+.speaking-wave{display:flex;align-items:center;gap:2px;height:13px;}
+.wave-bar{width:2px;background:var(--accent);border-radius:1px;animation:waveBounce .8s ease infinite;}
+.wave-bar:nth-child(1){height:4px;animation-delay:0s;}
+.wave-bar:nth-child(2){height:9px;animation-delay:.1s;}
+.wave-bar:nth-child(3){height:13px;animation-delay:.2s;}
+.wave-bar:nth-child(4){height:7px;animation-delay:.15s;}
+.wave-bar:nth-child(5){height:5px;animation-delay:.05s;}
+@keyframes waveBounce{0%,100%{transform:scaleY(.4);}50%{transform:scaleY(1);}}
+.raise-hand-anim{animation:raiseHand .4s ease;}
+@keyframes raiseHand{0%{transform:scale(.8);opacity:0;}60%{transform:scale(1.1);}100%{transform:scale(1);opacity:1;}}
+
+/* discussion feed */
+.discussion-feed{flex:1;overflow-y:auto;padding:18px 22px;}
+.discussion-feed::-webkit-scrollbar{width:3px;}
+.discussion-feed::-webkit-scrollbar-thumb{background:var(--border);}
+.discussion-msg{margin-bottom:18px;animation:msgIn .3s ease;}
+.discussion-msg-header{display:flex;align-items:center;gap:7px;margin-bottom:6px;}
+.d-agent-icon{font-size:17px;}
+.d-agent-name{font-size:12.5px;font-weight:600;color:var(--text);}
+.d-agent-role{font-size:10.5px;color:var(--text-muted);}
+.d-time{font-size:10px;color:var(--text-dim);margin-left:auto;}
+/* thinking toggle - Claude style */
+.thinking-block{margin-bottom:7px;}
+.thinking-toggle{display:inline-flex;align-items:center;gap:5px;font-size:11px;color:var(--text-muted);cursor:pointer;padding:2px 8px;border-radius:99px;background:var(--surface-2);border:1px solid var(--border);transition:all .15s;user-select:none;font-family:'JetBrains Mono',monospace;}
+.thinking-toggle:hover{color:var(--text);border-color:var(--border-light);}
+.thinking-toggle .arr{font-size:8px;transition:transform .2s;}
+.thinking-toggle.open .arr{transform:rotate(90deg);}
+.thinking-content{display:none;margin-top:5px;padding:11px 13px;background:var(--surface-2);border:1px solid var(--border);border-radius:var(--radius-sm);border-left:2px solid var(--purple);font-size:11.5px;line-height:1.7;color:var(--text-muted);font-family:'JetBrains Mono',monospace;}
+.thinking-content.open{display:block;animation:fadeIn .2s;}
+@keyframes fadeIn{from{opacity:0;}to{opacity:1;}}
+.d-bubble{padding:11px 15px;background:var(--surface-2);border:1px solid var(--border);border-radius:14px;border-top-left-radius:4px;font-size:13.5px;line-height:1.65;color:var(--text);}
+.d-bubble.mindx{background:rgba(61,255,192,.05);border-color:rgba(61,255,192,.2);border-left:2px solid var(--accent);}
+.d-bubble.user-msg{background:var(--accent-dim);border-color:rgba(61,255,192,.2);border-top-left-radius:14px;border-top-right-radius:4px;margin-left:auto;max-width:460px;}
+.typing-indicator{display:flex;align-items:center;gap:4px;padding:9px 13px;background:var(--surface-2);border:1px solid var(--border);border-radius:14px;border-top-left-radius:4px;width:fit-content;}
+.typing-dot{width:5px;height:5px;background:var(--text-muted);border-radius:50%;animation:typingBounce 1.2s infinite;}
+.typing-dot:nth-child(2){animation-delay:.2s;}
+.typing-dot:nth-child(3){animation-delay:.4s;}
+@keyframes typingBounce{0%,60%,100%{transform:translateY(0);opacity:.4;}30%{transform:translateY(-5px);opacity:1;}}
+
+/* meeting input */
+.meeting-input-area{padding:12px 18px 15px;border-top:1px solid var(--border);flex-shrink:0;}
+.meeting-input-hint{font-size:10.5px;color:var(--text-muted);margin-bottom:7px;display:flex;align-items:center;gap:6px;}
+.meeting-input-hint span{padding:1px 6px;background:var(--surface-2);border:1px solid var(--border);border-radius:4px;font-family:'JetBrains Mono',monospace;font-size:10px;}
+
+/* mindmap */
+.mindmap-container{flex:1;overflow:hidden;display:flex;align-items:center;justify-content:center;background:var(--bg);}
+.mindmap-svg{width:100%;height:100%;}
+
+/* history */
+.history-wrap{flex:1;overflow-y:auto;padding:30px 38px;}
+.history-wrap::-webkit-scrollbar{width:3px;}
+.history-wrap::-webkit-scrollbar-thumb{background:var(--border);}
+.history-header{margin-bottom:28px;}
+.history-title{font-family:'DM Serif Display',serif;font-size:26px;color:var(--text);margin-bottom:5px;}
+.history-sub{font-size:13.5px;color:var(--text-muted);}
+/* sidebar footer */
+.sidebar-footer{padding:8px 8px 12px;border-top:1px solid var(--border);flex-shrink:0;}
+.sb-footer-item{display:flex;align-items:center;gap:8px;padding:7px 10px;border-radius:var(--radius-sm);cursor:pointer;font-size:12.5px;color:var(--text-muted);transition:all .15s;}
+.sb-footer-item:hover{background:var(--surface-2);color:var(--text);}
+.sb-footer-item.active{background:var(--surface-3);color:var(--text);}
+.sb-footer-icon{font-size:13px;}
+
+.history-section-title{font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:1.2px;color:var(--text-dim);margin-bottom:11px;padding-bottom:7px;border-bottom:1px solid var(--border);}
+.history-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(290px,1fr));gap:14px;margin-bottom:28px;}
+.h-card{padding:16px 18px;background:var(--surface-1);border:1px solid var(--border);border-radius:var(--radius);cursor:pointer;transition:all .18s;position:relative;overflow:hidden;}
+.h-card::after{content:'';position:absolute;bottom:0;left:0;right:0;height:1px;background:linear-gradient(90deg,var(--accent),transparent);opacity:0;transition:opacity .2s;}
+.h-card:hover{border-color:var(--border-light);background:var(--surface-2);transform:translateY(-2px);}
+.h-card:hover::after{opacity:1;}
+.h-card-title{font-size:14px;font-weight:600;color:var(--text);margin-bottom:7px;}
+.h-card-agents{display:flex;gap:5px;margin-bottom:10px;flex-wrap:wrap;}
+.h-card-summary{font-size:11.5px;color:var(--text-muted);line-height:1.55;margin-bottom:10px;border-left:2px solid var(--accent);padding-left:9px;}
+.h-card-meta{display:flex;align-items:center;justify-content:space-between;font-size:10.5px;color:var(--text-muted);}
+/* ══ SETTINGS ══ */
+.settings-wrap{flex:1;overflow-y:auto;padding:32px 42px;}
+.settings-wrap::-webkit-scrollbar{width:3px;}
+.settings-wrap::-webkit-scrollbar-thumb{background:var(--border);}
+.settings-header{margin-bottom:30px;}
+.settings-title{font-family:'DM Serif Display',serif;font-size:26px;color:var(--text);margin-bottom:4px;}
+.settings-sub{font-size:13px;color:var(--text-muted);}
+.settings-section{margin-bottom:26px;max-width:680px;}
+.settings-section-title{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:1.2px;color:var(--text-muted);margin-bottom:10px;padding-bottom:6px;border-bottom:1px solid var(--border);}
+.settings-card{background:var(--surface-1);border:1px solid var(--border);border-radius:var(--radius);overflow:hidden;}
+.settings-row{display:flex;align-items:center;gap:14px;padding:16px 18px;}
+.settings-avatar{width:44px;height:44px;border-radius:50%;background:linear-gradient(135deg,var(--accent),var(--purple));display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:700;color:var(--bg);flex-shrink:0;}
+.settings-user-info{flex:1;}
+.settings-username{font-size:14px;font-weight:600;color:var(--text);}
+.settings-email{font-size:11.5px;color:var(--text-muted);margin-top:2px;}
+.settings-field{padding:14px 18px;}
+.settings-field-label{font-size:13px;font-weight:600;color:var(--text);margin-bottom:3px;}
+.settings-field-desc{font-size:11.5px;color:var(--text-muted);line-height:1.5;margin-bottom:10px;}
+.settings-toggle-row{display:flex;align-items:center;justify-content:space-between;gap:16px;padding:13px 18px;}
+.settings-divider{height:1px;background:var(--border);margin:0 18px;}
+/* toggle switch */
+.toggle{width:36px;height:20px;border-radius:99px;background:var(--border-light);cursor:pointer;position:relative;transition:background .2s;flex-shrink:0;}
+.toggle.on{background:var(--accent);}
+.toggle-knob{position:absolute;top:3px;left:3px;width:14px;height:14px;border-radius:50%;background:white;transition:transform .2s;box-shadow:0 1px 3px rgba(0,0,0,.3);}
+.toggle.on .toggle-knob{transform:translateX(16px);}
+/* model selector */
+.settings-select-group{display:flex;flex-direction:column;gap:6px;}
+.settings-select-opt{display:flex;align-items:center;gap:12px;padding:10px 13px;background:var(--surface-2);border:1px solid var(--border);border-radius:var(--radius-sm);cursor:pointer;transition:all .15s;}
+.settings-select-opt:hover{border-color:var(--border-light);}
+.settings-select-opt.selected{border-color:rgba(61,255,192,.35);background:var(--accent-dim);}
+.sel-dot{width:8px;height:8px;border-radius:50%;border:2px solid var(--border-light);flex-shrink:0;transition:all .15s;}
+.settings-select-opt.selected .sel-dot{background:var(--accent);border-color:var(--accent);}
+.sel-name{font-size:12.5px;font-weight:600;color:var(--text);}
+.sel-desc{font-size:11px;color:var(--text-muted);margin-top:1px;}
+/* slider */
+.settings-slider-row{display:flex;align-items:center;gap:10px;}
+.settings-slider-label{font-size:11px;color:var(--text-muted);}
+.settings-slider-val{font-size:12px;font-weight:600;color:var(--accent);min-width:48px;text-align:right;font-family:'JetBrains Mono',monospace;}
+.settings-slider{flex:1;-webkit-appearance:none;height:3px;border-radius:2px;background:var(--border-light);outline:none;cursor:pointer;}
+.settings-slider::-webkit-slider-thumb{-webkit-appearance:none;width:14px;height:14px;border-radius:50%;background:var(--accent);cursor:pointer;box-shadow:0 0 6px rgba(61,255,192,.4);}
+/* input */
+.settings-input-row{display:flex;gap:8px;align-items:center;}
+.settings-input{flex:1;padding:8px 12px;background:var(--surface-2);border:1px solid var(--border-light);border-radius:var(--radius-sm);color:var(--text);font-family:'JetBrains Mono',monospace;font-size:12px;outline:none;transition:border-color .15s;}
+.settings-input:focus{border-color:rgba(61,255,192,.4);}
+/* buttons */
+.settings-btn-outline{padding:6px 14px;background:none;border:1px solid var(--border-light);border-radius:var(--radius-xs);color:var(--text-muted);font-family:'Sora',sans-serif;font-size:12px;cursor:pointer;transition:all .15s;}
+.settings-btn-outline:hover{border-color:var(--border-light);color:var(--text);}
+.settings-btn-accent{padding:6px 14px;background:var(--accent-dim);border:1px solid rgba(61,255,192,.3);border-radius:var(--radius-xs);color:var(--accent);font-family:'Sora',sans-serif;font-size:12px;font-weight:600;cursor:pointer;transition:all .15s;}
+.settings-btn-accent:hover{background:rgba(61,255,192,.18);}
+.settings-btn-danger{padding:6px 14px;background:rgba(255,107,107,.08);border:1px solid rgba(255,107,107,.25);border-radius:var(--radius-xs);color:var(--red);font-family:'Sora',sans-serif;font-size:12px;cursor:pointer;transition:all .15s;flex-shrink:0;}
+.settings-btn-danger:hover{background:rgba(255,107,107,.15);}
+/* color swatches */
+.color-swatches{display:flex;gap:8px;margin-top:2px;}
+.color-swatch{width:24px;height:24px;border-radius:50%;cursor:pointer;transition:all .15s;border:2px solid transparent;}
+.color-swatch:hover{transform:scale(1.15);}
+.color-swatch.active{border-color:white;box-shadow:0 0 0 2px rgba(255,255,255,.25);}
+</style>
+</head>
+<body>
+
+<!-- ═══════ SIDEBAR ═══════ -->
+<div class="sidebar">
+  <div class="sidebar-top">
+    <div class="logo" onclick="showScreen('welcome')">
+      <div class="logo-icon">🧠</div>
+      <span class="logo-text">Mindpool</span>
+    </div>
+    <button class="new-pool-btn" onclick="showScreen('setup')">
+      <span>✦</span> New Pool
+    </button>
+  </div>
+
+  <div class="sidebar-body" id="sidebar-body">
+
+    <div class="sb-section">Meetings</div>
+
+    <div class="meeting-item active" data-meeting-id="m1" onclick="openMeeting(this)">
+      <div class="meeting-dot live"></div>
+      <div class="meeting-item-info">
+        <div class="meeting-item-title">Mobile App Strategy</div>
+        <div class="meeting-item-meta">📱💼👤🔒⚖️ · Live · 03:42</div>
+      </div>
+    </div>
+
+    <div class="meeting-item" data-meeting-id="m2" onclick="openMeeting(this)">
+      <div class="meeting-dot done"></div>
+      <div class="meeting-item-info">
+        <div class="meeting-item-title">Pricing Strategy Q2</div>
+        <div class="meeting-item-meta">💼📊🌍 · Done · Yesterday</div>
+      </div>
+    </div>
+
+    <div class="meeting-item" data-meeting-id="m3" onclick="openMeeting(this)">
+      <div class="meeting-dot done"></div>
+      <div class="meeting-item-info">
+        <div class="meeting-item-title">System Architecture</div>
+        <div class="meeting-item-meta">👨‍💻🔒📊 · Done · 2 days ago</div>
+      </div>
+    </div>
+
+    <div class="sb-divider"></div>
+
+    <div class="sb-section">Conversations</div>
+
+    <div class="conv-item active" data-conv-id="c1" onclick="openConv(this)">
+      <div class="conv-title">Mobile app for fintech startup</div>
+      <div class="conv-meta">Today · 2 meetings</div>
+      <div class="conv-meetings">
+        <div class="conv-meeting-chip" onclick="event.stopPropagation();openMeetingById('m1')">
+          <div class="conv-chip-dot" style="background:var(--accent)"></div>
+          <span class="conv-chip-text">Mobile App Strategy</span>
+          <span class="conv-chip-arrow">→</span>
+        </div>
+        <div class="conv-meeting-chip" onclick="event.stopPropagation();openMeetingById('m2')">
+          <div class="conv-chip-dot" style="background:var(--amber)"></div>
+          <span class="conv-chip-text">Pricing Strategy Q2</span>
+          <span class="conv-chip-arrow">→</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="conv-item" data-conv-id="c2" onclick="openConv(this)">
+      <div class="conv-title">System architecture review</div>
+      <div class="conv-meta">2 days ago · 1 meeting</div>
+      <div class="conv-meetings">
+        <div class="conv-meeting-chip" onclick="event.stopPropagation();openMeetingById('m3')">
+          <div class="conv-chip-dot" style="background:var(--amber)"></div>
+          <span class="conv-chip-text">System Architecture</span>
+          <span class="conv-chip-arrow">→</span>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- Sidebar footer -->
+  <div class="sidebar-footer">
+    <div class="sb-footer-item" id="nav-history" onclick="showScreen('history')">
+      <span class="sb-footer-icon">📋</span> All Pools
+    </div>
+    <div class="sb-footer-item" id="nav-settings" onclick="showScreen('settings')">
+      <span class="sb-footer-icon">⚙️</span> Settings
+    </div>
+  </div>
+</div>
+
+<!-- ═══════ MAIN ═══════ -->
+<div class="main">
+
+  <!-- ══ WELCOME SCREEN ══ -->
+  <div class="screen active" id="screen-welcome">
+    <div class="welcome-wrap">
+      <div class="welcome-glow"></div>
+      <div class="welcome-logo">🧠</div>
+      <div class="welcome-title">Welcome to <span>Mindpool</span></div>
+      <div class="welcome-sub">Tạo một phòng họp với những chuyên gia AI tốt nhất — mỗi agent một góc nhìn, cùng giúp bạn đưa ra quyết định tốt hơn.</div>
+      <button class="welcome-cta" onclick="showScreen('setup')">
+        ✦ Tạo Mindpool đầu tiên
+      </button>
+
+      <div class="welcome-features">
+        <div class="feat-card">
+          <div class="feat-icon">🙋</div>
+          <div class="feat-title">Raise Hand Queue</div>
+          <div class="feat-desc">Agents tự đăng ký phát biểu, không ai nói cùng lúc</div>
+        </div>
+        <div class="feat-card">
+          <div class="feat-icon">🗺</div>
+          <div class="feat-title">Mindmap View</div>
+          <div class="feat-desc">Visualize cuộc thảo luận thành sơ đồ tư duy trực quan</div>
+        </div>
+        <div class="feat-card">
+          <div class="feat-icon">⚡</div>
+          <div class="feat-title">Smart Setup</div>
+          <div class="feat-desc">AI gợi ý agent phù hợp nhất cho từng chủ đề của bạn</div>
+        </div>
+        <div class="feat-card">
+          <div class="feat-icon">📋</div>
+          <div class="feat-title">Auto Recap</div>
+          <div class="feat-desc">Tổng hợp kết luận và action items sau mỗi meeting</div>
+        </div>
+      </div>
+
+      <div class="welcome-recent">
+        <div class="welcome-recent-title">Gợi ý chủ đề để bắt đầu</div>
+        <div class="recent-row">
+          <div class="recent-pill" onclick="showScreen('setup')">📱 Nên build mobile app không?</div>
+          <div class="recent-pill" onclick="showScreen('setup')">💼 Pricing strategy cho SaaS</div>
+          <div class="recent-pill" onclick="showScreen('setup')">🏗 Review system architecture</div>
+          <div class="recent-pill" onclick="showScreen('setup')">👥 Chiến lược tuyển dụng</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══ SETUP CHAT (Conversation) ══ -->
+  <div class="screen" id="screen-setup">
+    <div class="chat-header">
+      <div>
+        <div class="chat-header-title" id="conv-title-header">MindX</div>
+        <div class="chat-header-sub" id="conv-sub-header">Mô tả chủ đề — AI sẽ gợi ý agents phù hợp</div>
+      </div>
+      <span class="tag tag-green">✦ Online</span>
+    </div>
+
+    <div class="chat-messages" id="chat-messages">
+      <!-- rendered by renderConv() -->
+    </div>
+
+    <div class="chat-input-area">
+      <div class="chat-input-wrap">
+        <textarea class="chat-input" id="setup-input" placeholder="Mô tả chủ đề bạn muốn thảo luận..." rows="1"
+          oninput="this.style.height='auto';this.style.height=this.scrollHeight+'px'"></textarea>
+        <button class="send-btn" onclick="sendSetupMsg()">↑</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══ MEETING ROOM ══ -->
+  <div class="screen" id="screen-meeting">
+    <div class="meeting-topbar">
+      <button class="back-btn" onclick="showScreen('setup')">← Back</button>
+      <div class="meeting-title-area">
+        <div class="meeting-title" id="meeting-title">—</div>
+        <div class="meeting-status">
+          <div class="status-dot" id="meeting-status-dot"></div>
+          <span class="status-text" id="meeting-status-text">—</span>
+        </div>
+      </div>
+      <div class="view-tabs">
+        <button class="view-tab active" onclick="switchView('chat',this)">💬 Chat</button>
+        <button class="view-tab" onclick="switchView('mindmap',this)">🗺 Mindmap</button>
+      </div>
+    </div>
+
+    <!-- Chat view -->
+    <div id="view-chat" class="meeting-body">
+      <div class="agents-panel" id="agents-panel">
+        <!-- rendered by JS -->
+      </div>
+      <div class="discussion-feed" id="discussion-feed">
+        <!-- rendered by JS -->
+      </div>
+    </div>
+
+    <!-- Mindmap view -->
+    <div id="view-mindmap" class="meeting-body" style="display:none;">
+      <div class="mindmap-container" id="mindmap-container">
+        <!-- rendered by JS -->
+      </div>
+    </div>
+
+    <div class="meeting-input-area">
+      <div class="meeting-input-hint">
+        <span>@agent</span> để hỏi riêng một agent · Agents tự raise hand khi có ý kiến
+      </div>
+      <div class="chat-input-wrap">
+        <textarea class="chat-input" id="meeting-input" placeholder="Nhắn tin với tất cả agents, hoặc @Mobile Engineer để hỏi riêng..." rows="1"
+          oninput="this.style.height='auto';this.style.height=this.scrollHeight+'px'"></textarea>
+        <button class="send-btn" onclick="sendMeetingMsg()">↑</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══ HISTORY ══ -->
+  <div class="screen" id="screen-history">
+    <div class="history-wrap">
+      <div class="history-header">
+        <div class="history-title">Your Mindpools</div>
+        <div class="history-sub">Tất cả các cuộc họp đã tạo · 3 pools</div>
+      </div>
+      <div class="history-section-title">Live</div>
+      <div class="history-grid">
+        <div class="h-card" onclick="openMeetingById('m1')">
+          <div class="h-card-title">Mobile App Strategy — Fintech Startup</div>
+          <div class="h-card-agents"><div class="agent-badge">📱</div><div class="agent-badge">💼</div><div class="agent-badge">👤</div><div class="agent-badge">🔒</div><div class="agent-badge">⚖️</div></div>
+          <div class="h-card-summary">"React Native là lựa chọn phù hợp. App là must-have cho Series A timeline."</div>
+          <div class="h-card-meta"><span class="tag tag-green">● Live</span><span>5 agents · 03:42</span></div>
+        </div>
+      </div>
+      <div class="history-section-title">This Week</div>
+      <div class="history-grid">
+        <div class="h-card" onclick="openMeetingById('m2')">
+          <div class="h-card-title">Pricing Strategy Q2 — SaaS Fintech</div>
+          <div class="h-card-agents"><div class="agent-badge">💼</div><div class="agent-badge">📊</div><div class="agent-badge">🌍</div></div>
+          <div class="h-card-summary">"Freemium với Pro tier $12/mo. Focus conversion free→paid trong 30 ngày đầu."</div>
+          <div class="h-card-meta"><span class="tag tag-amber">Completed</span><span>3 agents · 22 min</span></div>
+        </div>
+        <div class="h-card" onclick="openMeetingById('m3')">
+          <div class="h-card-title">System Architecture — Microservices</div>
+          <div class="h-card-agents"><div class="agent-badge">👨‍💻</div><div class="agent-badge">🔒</div><div class="agent-badge">📊</div></div>
+          <div class="h-card-summary">"Strangler Fig + NestJS microservices. Kafka cho event streaming, ClickHouse cho analytics."</div>
+          <div class="h-card-meta"><span class="tag tag-amber">Completed</span><span>3 agents · 45 min</span></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══ SETTINGS ══ -->
+  <div class="screen" id="screen-settings">
+    <div class="settings-wrap">
+
+      <div class="settings-header">
+        <div class="settings-title">Settings</div>
+        <div class="settings-sub">Tuỳ chỉnh Mindpool theo cách của bạn</div>
+      </div>
+
+      <!-- Profile -->
+      <div class="settings-section">
+        <div class="settings-section-title">👤 Profile</div>
+        <div class="settings-card">
+          <div class="settings-row">
+            <div class="settings-avatar">DT</div>
+            <div class="settings-user-info">
+              <div class="settings-username">Đông Trần</div>
+              <div class="settings-email">dong@mindpool.ai</div>
+            </div>
+            <button class="settings-btn-outline">Edit Profile</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- AI Model -->
+      <div class="settings-section">
+        <div class="settings-section-title">🤖 AI Model</div>
+        <div class="settings-card">
+          <div class="settings-field">
+            <div class="settings-field-label">Default Model</div>
+            <div class="settings-field-desc">Model dùng cho tất cả agents trong meeting</div>
+            <div class="settings-select-group">
+              <div class="settings-select-opt selected" onclick="selectModel(this)">
+                <div class="sel-dot"></div>
+                <div>
+                  <div class="sel-name">Claude Sonnet 4.5</div>
+                  <div class="sel-desc">Cân bằng tốc độ & chất lượng · Recommended</div>
+                </div>
+                <span class="tag tag-green">Active</span>
+              </div>
+              <div class="settings-select-opt" onclick="selectModel(this)">
+                <div class="sel-dot"></div>
+                <div>
+                  <div class="sel-name">Claude Opus 4</div>
+                  <div class="sel-desc">Suy luận sâu nhất · Chậm hơn, tốn token hơn</div>
+                </div>
+                <span class="tag tag-purple">Pro</span>
+              </div>
+              <div class="settings-select-opt" onclick="selectModel(this)">
+                <div class="sel-dot"></div>
+                <div>
+                  <div class="sel-name">Claude Haiku 4.5</div>
+                  <div class="sel-desc">Nhanh nhất · Tiết kiệm token · Phù hợp quick pools</div>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div class="settings-divider"></div>
+          <div class="settings-field">
+            <div class="settings-field-label">Thinking Budget</div>
+            <div class="settings-field-desc">Số giây tối đa cho mỗi agent để "suy nghĩ" trước khi phát biểu</div>
+            <div class="settings-slider-row">
+              <span class="settings-slider-label">5s</span>
+              <input type="range" class="settings-slider" min="3" max="30" value="10" oninput="document.getElementById('thinking-val').textContent=this.value+'s'">
+              <span class="settings-slider-label">30s</span>
+              <span class="settings-slider-val" id="thinking-val">10s</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Meeting Behaviour -->
+      <div class="settings-section">
+        <div class="settings-section-title">🎯 Meeting Behaviour</div>
+        <div class="settings-card">
+          <div class="settings-toggle-row">
+            <div>
+              <div class="settings-field-label">Auto-start discussion</div>
+              <div class="settings-field-desc">Agents tự bắt đầu thảo luận ngay khi meeting được tạo</div>
+            </div>
+            <div class="toggle on" onclick="this.classList.toggle('on')"><div class="toggle-knob"></div></div>
+          </div>
+          <div class="settings-divider"></div>
+          <div class="settings-toggle-row">
+            <div>
+              <div class="settings-field-label">Show thinking by default</div>
+              <div class="settings-field-desc">Expand thinking block tự động thay vì ẩn đi</div>
+            </div>
+            <div class="toggle" onclick="this.classList.toggle('on')"><div class="toggle-knob"></div></div>
+          </div>
+          <div class="settings-divider"></div>
+          <div class="settings-toggle-row">
+            <div>
+              <div class="settings-field-label">MindX Orchestrator</div>
+              <div class="settings-field-desc">MindX tự động điều phối mọi pool — chọn agent mở đầu, quản lý queue, và tổng hợp kết thúc</div>
+            </div>
+            <div class="toggle on" onclick="this.classList.toggle('on')"><div class="toggle-knob"></div></div>
+          </div>
+          <div class="settings-divider"></div>
+          <div class="settings-toggle-row">
+            <div>
+              <div class="settings-field-label">Auto Recap</div>
+              <div class="settings-field-desc">Tự tổng hợp kết luận và action items khi meeting kết thúc</div>
+            </div>
+            <div class="toggle on" onclick="this.classList.toggle('on')"><div class="toggle-knob"></div></div>
+          </div>
+          <div class="settings-divider"></div>
+          <div class="settings-field">
+            <div class="settings-field-label">Max agents per pool</div>
+            <div class="settings-field-desc">Giới hạn số lượng agent trong một meeting</div>
+            <div class="settings-slider-row">
+              <span class="settings-slider-label">2</span>
+              <input type="range" class="settings-slider" min="2" max="10" value="6" oninput="document.getElementById('agent-max-val').textContent=this.value+' agents'">
+              <span class="settings-slider-label">10</span>
+              <span class="settings-slider-val" id="agent-max-val">6 agents</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Appearance -->
+      <div class="settings-section">
+        <div class="settings-section-title">🎨 Appearance</div>
+        <div class="settings-card">
+          <div class="settings-toggle-row">
+            <div>
+              <div class="settings-field-label">Compact sidebar</div>
+              <div class="settings-field-desc">Thu gọn sidebar, chỉ hiện icon</div>
+            </div>
+            <div class="toggle" onclick="this.classList.toggle('on')"><div class="toggle-knob"></div></div>
+          </div>
+          <div class="settings-divider"></div>
+          <div class="settings-field">
+            <div class="settings-field-label">Accent color</div>
+            <div class="settings-field-desc">Màu chủ đạo của toàn bộ giao diện</div>
+            <div class="color-swatches">
+              <div class="color-swatch active" style="background:#3dffc0" onclick="selectAccent(this,'#3dffc0')"></div>
+              <div class="color-swatch" style="background:#8b7cf8" onclick="selectAccent(this,'#8b7cf8')"></div>
+              <div class="color-swatch" style="background:#ffc46b" onclick="selectAccent(this,'#ffc46b')"></div>
+              <div class="color-swatch" style="background:#ff6b9d" onclick="selectAccent(this,'#ff6b9d')"></div>
+              <div class="color-swatch" style="background:#6bb5ff" onclick="selectAccent(this,'#6bb5ff')"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- API / Integrations -->
+      <div class="settings-section">
+        <div class="settings-section-title">🔑 API & Integrations</div>
+        <div class="settings-card">
+          <div class="settings-field">
+            <div class="settings-field-label">Anthropic API Key</div>
+            <div class="settings-field-desc">Dùng API key riêng thay vì quota mặc định</div>
+            <div class="settings-input-row">
+              <input type="password" class="settings-input" placeholder="sk-ant-api03-••••••••" value="sk-ant-api03-••••••••">
+              <button class="settings-btn-outline" style="flex-shrink:0">Reveal</button>
+              <button class="settings-btn-accent" style="flex-shrink:0">Save</button>
+            </div>
+          </div>
+          <div class="settings-divider"></div>
+          <div class="settings-toggle-row">
+            <div>
+              <div class="settings-field-label">Jira Integration</div>
+              <div class="settings-field-desc">Tạo Jira tasks tự động từ action items trong recap</div>
+            </div>
+            <button class="settings-btn-outline">Connect</button>
+          </div>
+          <div class="settings-divider"></div>
+          <div class="settings-toggle-row">
+            <div>
+              <div class="settings-field-label">Notion Export</div>
+              <div class="settings-field-desc">Export recap và mindmap sang Notion workspace</div>
+            </div>
+            <button class="settings-btn-outline">Connect</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Danger Zone -->
+      <div class="settings-section">
+        <div class="settings-section-title" style="color:var(--red)">⚠️ Danger Zone</div>
+        <div class="settings-card" style="border-color:rgba(255,107,107,.2)">
+          <div class="settings-toggle-row">
+            <div>
+              <div class="settings-field-label">Clear all archived pools</div>
+              <div class="settings-field-desc">Xoá vĩnh viễn tất cả pools đã archived</div>
+            </div>
+            <button class="settings-btn-danger">Clear</button>
+          </div>
+          <div class="settings-divider"></div>
+          <div class="settings-toggle-row">
+            <div>
+              <div class="settings-field-label">Delete account</div>
+              <div class="settings-field-desc">Xoá toàn bộ dữ liệu và tài khoản, không thể khôi phục</div>
+            </div>
+            <button class="settings-btn-danger">Delete</button>
+          </div>
+        </div>
+      </div>
+
+      <div style="height:40px"></div>
+    </div>
+  </div>
+
+</div><!-- end main -->
+
+<script>
+// ═══════════════════════════════════════════════════════
+// DATA STORE — single source of truth
+// ═══════════════════════════════════════════════════════
+
+const MEETINGS = {
+  m1: {
+    title: 'Mobile App Strategy — Fintech Startup',
+    status: 'live',
+    statusText: '5 agents · 03:42 · ● Live',
+    agents: [
+      { icon:'🧠', name:'MindX', role:'Orchestrator', state:'moderating' },
+      { icon:'💼', name:'Business Strategist', role:'Strategist', state:'speaking' },
+      { icon:'📱', name:'Mobile Engineer',     role:'Engineer',   state:'queued', queue:1 },
+      { icon:'🔒', name:'Security Expert',     role:'Expert',     state:'queued', queue:2 },
+      { icon:'👤', name:'UX Designer',         role:'Designer',   state:'listening' },
+      { icon:'⚖️', name:'Legal Advisor',       role:'Advisor',    state:'listening' },
+    ],
+    messages: [
+      { type:'agent', icon:'🧠', name:'MindX', role:'Orchestrator', time:'10:27 AM',
+        text:'Mindpool đã sẵn sàng! Chủ đề: <strong>Mobile App cho Fintech Startup</strong>.<br><br>Tôi sẽ bắt đầu với <strong>💼 Business Strategist</strong> — đặt frame cho bài toán business trước, sau đó chuyển sang góc nhìn kỹ thuật.' },
+      { type:'agent', icon:'📱', name:'Mobile Engineer', role:'Tech Lead', time:'10:28 AM',
+        thinkSec:3, thinking:'Fintech startup seed stage. Native vs PWA vs RN...\nRN 2024 đã đủ mature cho fintech — biometric auth handle được.\n→ RN là sweet spot nhưng cần confirm security requirements.',
+        text:'Nhìn từ góc kỹ thuật, <strong>React Native</strong> là lựa chọn thực tế nhất. Một codebase chạy cả iOS và Android, giảm cost 40-50% so với native riêng.<br><br>Tuy nhiên cần xét kỹ: biometric auth và deep encryption cho payment — RN handle được nhưng cần thêm native modules. Bạn có thể share yêu cầu bảo mật cụ thể không?' },
+      { type:'agent', icon:'💼', name:'Business Strategist', role:'Business', time:'10:29 AM',
+        thinkSec:4, thinking:'Mobile Eng suggest RN — đồng ý về tech.\nNhưng câu hỏi: tại sao cần app ngay?\nSeed stage → burn rate là priority.\nPWA có thể validate user behavior trước khi commit full app budget.',
+        text:'Đồng ý về RN, nhưng muốn đặt câu hỏi chiến lược: <strong>bạn có cần app ngay không?</strong><br><br>Ở seed stage, mỗi tháng phát triển là burn. <strong>PWA</strong> có thể test user behavior với chi phí thấp hơn 60-70%.' },
+      { type:'user', time:'10:31 AM',
+        text:'Startup đã có khoảng 2000 beta users, conversion rate khá tốt. Investor muốn thấy mobile app để raise Series A.' },
+      { type:'agent', icon:'💼', name:'Business Strategist', role:'Business', time:'10:32 AM',
+        text:'Với context đó thì rõ ràng — 2000 validated users + investor pressure cho Series A thì <strong>app là must-have</strong>. React Native là lựa chọn đúng. Timeline 3-4 tháng, ship MVP mobile để show cho investors trước round.' },
+      { type:'agent', icon:'🔒', name:'Security Expert', role:'Security', time:'10:33 AM',
+        thinkSec:4, thinking:'PCI DSS scope là mandatory cho fintech payment.\nBiometric auth trên RN cần react-native-biometrics.\nCần pen test trước khi submit App Store.',
+        text:'Từ góc bảo mật: RN có thể đạt PCI DSS compliance nhưng cần <strong>native modules riêng</strong> cho biometric + encryption. Recommend thêm certificate pinning và obfuscation trước khi submit Store.' },
+      { type:'typing', icon:'💼', name:'Business Strategist', role:'đang phát biểu...', time:'10:34 AM',
+        thinkSec:5, thinking:'Series A target + 2000 users. Nếu raise Q2 → cần app demo trước 6 tuần.\nRN timeline 3-4 tháng. Core: auth + main flow + push notifications.\nApp Store cut 30% phải tính vào unit economics trước khi pitch...' },
+    ],
+    sendAgents: [
+      { icon:'📱', name:'Mobile Engineer', role:'Tech perspective' },
+      { icon:'🔒', name:'Security Expert', role:'Security perspective' },
+      { icon:'👤', name:'UX Designer', role:'Design perspective' },
+      { icon:'⚖️', name:'Legal Advisor', role:'Legal perspective' },
+    ],
+    mapCenter: 'Mobile App Decision', mapCenterSub: 'Fintech · 5 agents',
+    mapNodes: [
+      { label:'Tech Stack',    sub:'📱 Mobile Eng', val:'React Native ✓', color:'#8b7cf8', x:55,  y:88,  cx:305, cy:240 },
+      { label:'Business Case', sub:'💼 Strategist',  val:'Series A must ✓', color:'#ffc46b', x:55,  y:358, cx:305, cy:265 },
+      { label:'Security',      sub:'🔒 Expert',      val:'PCI DSS ⚠️',     color:'#ff6b6b', x:595, y:88,  cx:495, cy:240 },
+      { label:'UX Impact',     sub:'👤 Designer',    val:'⏳ Pending',      color:'#6b6b90', x:595, y:358, cx:495, cy:265 },
+    ]
+  },
+
+  m2: {
+    title: 'Pricing Strategy Q2 — SaaS Fintech',
+    status: 'done',
+    statusText: '3 agents · 22 min · ✓ Completed',
+    agents: [
+      { icon:'🧠', name:'MindX', role:'Orchestrator', state:'moderating' },
+      { icon:'💼', name:'Business Strategist', role:'Strategist', state:'listening' },
+      { icon:'📊', name:'Data Scientist',      role:'Analyst',    state:'listening' },
+      { icon:'🌍', name:'Ethicist',            role:'Advisor',    state:'listening' },
+    ],
+    messages: [
+      { type:'agent', icon:'🧠', name:'MindX', role:'Orchestrator', time:'2:14 PM',
+        text:'Chủ đề: <strong>Pricing Strategy Q2</strong>. Tôi sẽ mở đầu với <strong>💼 Business Strategist</strong> để đặt framework, sau đó <strong>📊 Data Scientist</strong> bổ sung số liệu.' },
+      { type:'user', time:'2:14 PM',
+        text:'Tôi đang cân nhắc pricing cho SaaS fintech — Free tier vs Freemium vs paid-only. Target là SME Việt Nam.' },
+      { type:'agent', icon:'💼', name:'Business Strategist', role:'Business', time:'2:15 PM',
+        thinkSec:4, thinking:'SME VN market. Price sensitivity cao hơn enterprise.\nFreemium phù hợp để acquire. Conversion rate thường 2-5%.\nNeed: clear value prop ở paid tier.',
+        text:'Cho thị trường SME Việt Nam, <strong>Freemium</strong> là lựa chọn hợp lý nhất. Free tier đủ value để viral, nhưng giới hạn rõ ràng để push upgrade.<br><br>Đề xuất: Free (3 pools/tháng) → Pro $12/mo → Team $49/mo. Đã proven ở Notion, Linear.' },
+      { type:'agent', icon:'📊', name:'Data Scientist', role:'Analytics', time:'2:16 PM',
+        thinkSec:3, thinking:'Conversion funnel analysis. SME churn cao nếu không thấy value trong 30 ngày.\nTime-to-value là key metric.',
+        text:'Dựa trên benchmark SaaS B2B, conversion free→paid thường đạt <strong>3-7%</strong> với proper nurturing.<br><br>Key: user cần "aha moment" trong 30 ngày đầu. Track activation metric: 1 completed pool trong 7 ngày = 3x higher conversion probability.' },
+      { type:'user', time:'2:18 PM',
+        text:'Bạn nghĩ sao về việc charge per pool thay vì monthly subscription?' },
+      { type:'agent', icon:'🌍', name:'Ethicist', role:'Ethics & fairness', time:'2:19 PM',
+        text:'Usage-based pricing có ưu điểm về fairness — pay for what you use. Nhưng với SME, predictable cost thường được prefer hơn variable.<br><br>Hybrid có thể work: subscription base + pay-per-pool cho usage vượt quota.' },
+      { type:'agent', icon:'💼', name:'Business Strategist', role:'Business', time:'2:21 PM',
+        text:'<strong>Kết luận:</strong> Freemium với 3 tiers là optimal. Free → Pro $12/mo → Team $49/mo. Ưu tiên onboarding flow để hit "aha moment" trong 7 ngày đầu. Review pricing sau 3 tháng khi có đủ data conversion.' },
+      { type:'agent', icon:'🧠', name:'MindX', role:'Orchestrator', time:'2:23 PM',
+        text:'Pool đã đạt convergence — các agents đồng thuận về hướng Freemium.<br><br>✓ <strong>Đồng thuận:</strong> Freemium · Free → $12 → $49/mo<br>✓ <strong>Key metric:</strong> Activation trong 7 ngày đầu<br>⚠️ <strong>Cần theo dõi:</strong> Conversion rate thực tế sau 3 tháng<br><br><strong>Action items:</strong><br>1. Thiết kế onboarding flow để hit "aha moment" trong 7 ngày<br>2. Setup tracking: activation event = 1 completed pool<br>3. Review pricing sau Q3 khi có conversion data' },
+    ],
+    sendAgents: [
+      { icon:'💼', name:'Business Strategist', role:'Business perspective' },
+      { icon:'📊', name:'Data Scientist',      role:'Analytics perspective' },
+      { icon:'🌍', name:'Ethicist',            role:'Ethics perspective' },
+    ],
+    mapCenter: 'Pricing Strategy Q2', mapCenterSub: 'SaaS Fintech · 3 agents',
+    mapNodes: [
+      { label:'Freemium Model',   sub:'💼 Strategist', val:'Free→$12→$49 ✓', color:'#3dffc0', x:40,  y:88,  cx:305, cy:240 },
+      { label:'Conversion KPI',   sub:'📊 Data Sci',   val:'3-7% target ✓',  color:'#8b7cf8', x:40,  y:358, cx:305, cy:265 },
+      { label:'Activation KPI',   sub:'📊 Data Sci',   val:'1 pool/7 days ✓',color:'#ffc46b', x:600, y:88,  cx:495, cy:240 },
+      { label:'Ethics/Fairness',  sub:'🌍 Ethicist',   val:'Hybrid model ✓', color:'#6b6b90', x:600, y:358, cx:495, cy:265 },
+    ]
+  },
+
+  m3: {
+    title: 'System Architecture Review — Microservices',
+    status: 'done',
+    statusText: '3 agents · 45 min · ✓ Completed',
+    agents: [
+      { icon:'🧠', name:'MindX', role:'Orchestrator', state:'moderating' },
+      { icon:'👨‍💻', name:'Senior Dev',      role:'Tech Lead', state:'listening' },
+      { icon:'🔒',   name:'Security Expert', role:'Expert',    state:'listening' },
+      { icon:'📊',   name:'Data Engineer',   role:'Engineer',  state:'listening' },
+    ],
+    messages: [
+      { type:'agent', icon:'🧠', name:'MindX', role:'Orchestrator', time:'9:10 AM',
+        text:'Chủ đề: <strong>System Architecture Review — NestJS → Microservices</strong>.<br><br>Bắt đầu với <strong>👨‍💻 Senior Dev</strong> để đặt migration strategy, sau đó <strong>🔒 Security</strong> và <strong>📊 Data Engineer</strong> sẽ bổ sung.' },
+      { type:'user', time:'9:10 AM',
+        text:'Review kiến trúc hiện tại: NestJS monolith → muốn migrate sang microservices. Payment service, loyalty service, notification service.' },
+      { type:'agent', icon:'👨‍💻', name:'Senior Dev', role:'Tech Lead', time:'9:11 AM',
+        thinkSec:6, thinking:'NestJS monolith migration. Fintech context.\nStrangler Fig là approach đúng — không rewrite from scratch.\nKafka cho event-driven communication.\nKubernetes cho orchestration.',
+        text:'Recommend <strong>Strangler Fig pattern</strong> — đừng rewrite from scratch. Tách từng service ra dần, bắt đầu từ service ít coupled nhất (notification service).<br><br>Stack: <strong>NestJS microservices</strong> + Kafka + Kong API Gateway + PostgreSQL per service. Timeline: 3-4 tháng cho full migration.' },
+      { type:'agent', icon:'🔒', name:'Security Expert', role:'Security', time:'9:13 AM',
+        thinkSec:5, thinking:'Microservices = larger attack surface.\nService-to-service auth cần mTLS.\nPayment service: PCI DSS scope isolation quan trọng.',
+        text:'Với fintech, microservices cần extra security attention. <strong>mTLS</strong> cho service-to-service là must. Payment service nên được isolate trong PCI DSS scope riêng.<br><br>Thêm: HashiCorp Vault cho secrets + OpenTelemetry distributed tracing để detect anomalies.' },
+      { type:'agent', icon:'📊', name:'Data Engineer', role:'Data', time:'9:15 AM',
+        text:'Đừng quên data layer. Suggest <strong>ClickHouse</strong> cho analytics queries (loyalty/transaction — read-heavy). Kafka → ClickHouse consumer cho real-time analytics.<br><br>CQRS pattern cho payment service: write to PostgreSQL, read từ materialized view. Tách biệt read/write load hiệu quả.' },
+      { type:'user', time:'9:18 AM',
+        text:'Redis có cần không hay có thể dùng Kafka thay?' },
+      { type:'agent', icon:'👨‍💻', name:'Senior Dev', role:'Tech Lead', time:'9:19 AM',
+        text:'Khác nhau use case — không thay thế được nhau. <strong>Redis</strong>: session cache, rate limiting, real-time leaderboard, pub/sub in-process. <strong>Kafka</strong>: event streaming cross-service, audit log, guaranteed delivery, replay. Cần cả hai.' },
+      { type:'agent', icon:'🔒', name:'Security Expert', role:'Security', time:'9:21 AM',
+        text:'<strong>Kết luận security:</strong> mTLS giữa services, HashiCorp Vault cho secrets, PCI DSS scope isolation cho payment. Recommend pen test trước khi go-live. OpenTelemetry giúp detect anomaly sớm trong production.' },
+      { type:'agent', icon:'🧠', name:'MindX', role:'Orchestrator', time:'9:23 AM',
+        text:'Pool completed — tất cả góc nhìn đã được cover.<br><br>✓ <strong>Migration strategy:</strong> Strangler Fig · NestJS microservices + Kafka<br>✓ <strong>Security layer:</strong> mTLS + HashiCorp Vault + PCI DSS isolation<br>✓ <strong>Data layer:</strong> ClickHouse analytics + CQRS + Redis<br><br><strong>Action items:</strong><br>1. Tách Notification Service trước — ít coupled nhất<br>2. Setup Kafka + Kong API Gateway<br>3. PCI DSS scope review với Security team<br>4. Pen test trước go-live' },
+    ],
+    sendAgents: [
+      { icon:'👨‍💻', name:'Senior Dev',      role:'Tech Lead perspective' },
+      { icon:'🔒',   name:'Security Expert', role:'Security perspective' },
+      { icon:'📊',   name:'Data Engineer',   role:'Data perspective' },
+    ],
+    mapCenter: 'System Architecture', mapCenterSub: 'Microservices Migration · 3 agents',
+    mapNodes: [
+      { label:'Strangler Fig', sub:'👨‍💻 Senior Dev', val:'NestJS + Kafka ✓', color:'#3dffc0', x:30,  y:88,  cx:295, cy:240 },
+      { label:'Security Layer',sub:'🔒 Expert',      val:'mTLS + Vault ✓',  color:'#ff6b6b', x:30,  y:358, cx:295, cy:265 },
+      { label:'Analytics',     sub:'📊 Data Eng',    val:'ClickHouse ✓',    color:'#ffc46b', x:600, y:88,  cx:505, cy:240 },
+      { label:'CQRS Pattern',  sub:'📊 Data Eng',    val:'PG + Redis ✓',    color:'#8b7cf8', x:600, y:358, cx:505, cy:265 },
+    ]
+  }
+};
+
+const CONVS = {
+  c1: {
+    id: 'c1',
+    title: 'Mobile app for fintech startup',
+    sub: 'Today · 2 meetings',
+    messages: [
+      { type:'bot', time:'10:24 AM',
+        content:'Xin chào! Tôi là <strong>MindX</strong> — trợ lý điều phối của Mindpool.<br><br>Hãy mô tả chủ đề bạn muốn thảo luận — tôi sẽ gợi ý những expert agent phù hợp nhất và tạo <strong>Mindpool</strong> cho bạn. 🎯' },
+      { type:'user', time:'10:25 AM',
+        content:'Tôi muốn thảo luận về việc có nên build mobile app riêng cho startup fintech không, hay dùng PWA hoặc React Native thôi?' },
+      { type:'bot-agents', time:'10:25 AM',
+        intro:'Chủ đề hay! Đây là quyết định tech + business quan trọng. Tôi gợi ý <strong>5 expert</strong> cho pool này:',
+        agents:[
+          {icon:'📱', name:'Mobile Engineer',    desc:'Tech stack, performance, native vs cross-platform', checked:true},
+          {icon:'💼', name:'Business Strategist',desc:'ROI, burn rate, investor expectation',               checked:true},
+          {icon:'👤', name:'UX Designer',        desc:'User experience, onboarding, conversion',            checked:true},
+          {icon:'🔒', name:'Security Expert',    desc:'Fintech compliance, PCI DSS',                        checked:true},
+          {icon:'⚖️', name:'Legal Advisor',      desc:'Quy định NHNN, licensing, terms & privacy',         checked:false},
+        ],
+        btnId:'start-btn-c1-m1', meetingId:'m1' },
+      { type:'bot-created', time:'10:26 AM', meetingId:'m1',
+        meetingTitle:'Mobile App Strategy — Fintech Startup',
+        agents:['📱 Mobile Eng','💼 Business','👤 UX','🔒 Security','⚖️ Legal'] },
+      { type:'user', time:'2:10 PM',
+        content:'Cảm ơn! Tiếp tục — tôi muốn thảo luận về pricing strategy cho app sau khi launch.' },
+      { type:'bot-agents', time:'2:11 PM',
+        intro:'Cho pricing strategy, tôi recommend lineup gọn hơn — <strong>3 expert</strong> tập trung vào business & data:',
+        agents:[
+          {icon:'💼', name:'Business Strategist',desc:'Revenue model, competitive pricing',   checked:true},
+          {icon:'📊', name:'Data Scientist',     desc:'Market analysis, willingness-to-pay',  checked:true},
+          {icon:'🌍', name:'Ethicist',           desc:'Fair pricing, user trust',              checked:true},
+        ],
+        btnId:'start-btn-c1-m2', meetingId:'m2' },
+      { type:'bot-created', time:'2:13 PM', meetingId:'m2',
+        meetingTitle:'Pricing Strategy Q2 — SaaS Fintech',
+        agents:['💼 Business','📊 Data','🌍 Ethicist'] },
+    ]
+  },
+  c2: {
+    id: 'c2',
+    title: 'System architecture review',
+    sub: '2 days ago · 1 meeting',
+    messages: [
+      { type:'bot', time:'9:08 AM',
+        content:'Xin chào! Tôi là <strong>MindX</strong>. Bạn muốn thảo luận về chủ đề gì hôm nay? 🎯' },
+      { type:'user', time:'9:09 AM',
+        content:'Tôi cần review system architecture — đang có NestJS monolith, muốn migrate sang microservices nhưng không biết bắt đầu từ đâu.' },
+      { type:'bot-agents', time:'9:09 AM',
+        intro:'Architecture review cho fintech migration — cần <strong>3 expert</strong> cover đủ góc nhìn kỹ thuật, security và data:',
+        agents:[
+          {icon:'👨‍💻', name:'Senior Dev',      desc:'Microservices patterns, migration strategy', checked:true},
+          {icon:'🔒',   name:'Security Expert', desc:'Service mesh, mTLS, secrets management',     checked:true},
+          {icon:'📊',   name:'Data Engineer',   desc:'Event streaming, CQRS, analytics layer',     checked:true},
+        ],
+        btnId:'start-btn-c2-m3', meetingId:'m3' },
+      { type:'bot-created', time:'9:10 AM', meetingId:'m3',
+        meetingTitle:'System Architecture Review — Microservices',
+        agents:['👨‍💻 Senior Dev','🔒 Security','📊 Data Eng'] },
+    ]
+  }
+};
+
+// ─── State ───────────────────────────────────────
+let currentMeetingId = null;
+let lastActiveConv   = null;
+const meetingCreatedFlags = {};
+
+// ═══════════════════════════════════════════════════════
+// RENDER: MEETING ROOM
+// ═══════════════════════════════════════════════════════
+
+function renderMeeting(id) {
+  const m = MEETINGS[id];
+  if (!m) return;
+  currentMeetingId = id;
+
+  // Topbar
+  document.getElementById('meeting-title').textContent = m.title;
+  const dot  = document.getElementById('meeting-status-dot');
+  const stext= document.getElementById('meeting-status-text');
+  stext.textContent   = m.statusText;
+  dot.style.background= m.status === 'live' ? 'var(--accent)' : m.status === 'done' ? 'var(--amber)' : 'var(--text-dim)';
+  dot.style.animation = m.status === 'live' ? 'pulse 2s infinite' : 'none';
+
+  // Input lock for non-live
+  const input   = document.getElementById('meeting-input');
+  const sendBtn = document.querySelector('#screen-meeting .send-btn');
+  if (m.status === 'live') {
+    input.disabled = false;
+    input.placeholder = 'Nhắn tin với tất cả agents, hoặc @agent để hỏi riêng...';
+    sendBtn.style.opacity = '1'; sendBtn.style.pointerEvents = 'auto';
+  } else {
+    input.disabled = true;
+    input.placeholder = '✓ Meeting đã kết thúc — chỉ xem lịch sử';
+    sendBtn.style.opacity = '0.35'; sendBtn.style.pointerEvents = 'none';
+  }
+
+  renderAgents(m.agents);
+  renderFeed(m.messages);
+  document.getElementById('mindmap-container').innerHTML = buildMindmap(m);
+}
+
+function renderAgents(agents) {
+  const panel = document.getElementById('agents-panel');
+  let html = `<div class="agents-panel-title">Agents · ${agents.length}</div>`;
+  agents.forEach(a => {
+    if (a.state === 'moderating') {
+      html += `<div class="agent-card moderating">
+        <div class="agent-card-row"><div class="agent-icon">${a.icon}</div><div class="agent-info"><div class="agent-name">${a.name}</div><div class="agent-role">${a.role}</div></div></div>
+        <div style="margin-top:6px;text-align:right;"><span class="agent-status-badge badge-moderating">✦ Moderating</span></div></div>`;
+    } else if (a.state === 'speaking') {
+      html += `<div class="agent-card speaking">
+        <div class="agent-card-row"><div class="agent-icon">${a.icon}</div><div class="agent-info"><div class="agent-name">${a.name}</div><div class="agent-role">${a.role}</div></div></div>
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-top:6px;">
+          <div class="speaking-wave"><div class="wave-bar"></div><div class="wave-bar"></div><div class="wave-bar"></div><div class="wave-bar"></div><div class="wave-bar"></div></div>
+          <span class="agent-status-badge badge-speaking">🎤 Speaking</span>
+        </div></div>`;
+    } else if (a.state === 'queued') {
+      html += `<div class="agent-card queued">
+        <div class="agent-card-row"><div class="agent-icon">${a.icon}</div><div class="agent-info"><div class="agent-name">${a.name}</div><div class="agent-role">${a.role}</div></div><div class="queue-order">${a.queue}</div></div>
+        <div style="margin-top:6px;text-align:right;"><span class="agent-status-badge badge-queued">✋ Queue #${a.queue}</span></div></div>`;
+    } else {
+      html += `<div class="agent-card listening">
+        <div class="agent-card-row"><div class="agent-icon">${a.icon}</div><div class="agent-info"><div class="agent-name">${a.name}</div><div class="agent-role">${a.role}</div></div></div>
+        <div style="margin-top:6px;text-align:right;"><span class="agent-status-badge badge-listening">○ Listening</span></div></div>`;
+    }
+  });
+  html += `<button class="add-agent-btn">＋ Add Agent</button>`;
+  panel.innerHTML = html;
+}
+
+function renderFeed(messages) {
+  const feed = document.getElementById('discussion-feed');
+  let html = '';
+  messages.forEach(m => {
+    if (m.type === 'user') {
+      html += `<div class="discussion-msg" style="display:flex;justify-content:flex-end;">
+        <div style="max-width:460px"><div class="d-bubble user-msg">${m.text}</div>
+        <div style="text-align:right;color:var(--text-dim);font-size:10px;margin-top:4px">${m.time}</div></div></div>`;
+    } else if (m.type === 'typing') {
+      const tb = m.thinking ? `<div class="thinking-block"><span class="thinking-toggle open" onclick="toggleThinking(this)"><span class="arr">▶</span> Thought for ${m.thinkSec} seconds</span><div class="thinking-content open">${m.thinking.replace(/\n/g,'<br>')}</div></div>` : '';
+      html += `<div class="discussion-msg">
+        <div class="discussion-msg-header"><span class="d-agent-icon">${m.icon}</span><div><div class="d-agent-name">${m.name}</div><div class="d-agent-role" style="color:var(--accent)">${m.role}</div></div><div class="d-time">${m.time}</div></div>
+        ${tb}<div class="typing-indicator"><div class="typing-dot"></div><div class="typing-dot"></div><div class="typing-dot"></div></div></div>`;
+    } else {
+      const isMindX = m.name === 'MindX';
+      const tb = m.thinking ? `<div class="thinking-block"><span class="thinking-toggle" onclick="toggleThinking(this)"><span class="arr">▶</span> Thought for ${m.thinkSec} seconds</span><div class="thinking-content">${m.thinking.replace(/\n/g,'<br>')}</div></div>` : '';
+      html += `<div class="discussion-msg">
+        <div class="discussion-msg-header"><span class="d-agent-icon">${m.icon}</span><div><div class="d-agent-name">${m.name}</div><div class="d-agent-role">${m.role}</div></div><div class="d-time">${m.time}</div></div>
+        ${tb}<div class="d-bubble${isMindX ? ' mindx' : ''}">${m.text}</div></div>`;
+    }
+  });
+  feed.innerHTML = html;
+  feed.scrollTop = feed.scrollHeight;
+}
+
+function buildMindmap(m) {
+  const accent = getComputedStyle(document.documentElement).getPropertyValue('--accent').trim() || '#3dffc0';
+  const statusLabel = m.status==='live' ? '● Ongoing' : m.status==='done' ? '✓ Completed' : '⬜ Archived';
+  const nodesHtml = m.mapNodes.map(n => `
+    <line x1="${n.cx}" y1="${n.cy}" x2="${n.x+75}" y2="${n.y+32}" stroke="${n.color}" stroke-width="1.5" opacity=".6"/>
+    <rect x="${n.x}" y="${n.y}" width="150" height="64" rx="9" fill="#161624" stroke="${n.color}" stroke-width="1.2"/>
+    <text x="${n.x+75}" y="${n.y+19}" text-anchor="middle" fill="${n.color}" font-family="Sora" font-size="11" font-weight="600">${n.label}</text>
+    <text x="${n.x+75}" y="${n.y+35}" text-anchor="middle" fill="#6b6b90" font-family="Sora" font-size="10">${n.sub}</text>
+    <text x="${n.x+75}" y="${n.y+51}" text-anchor="middle" fill="#e4e4f4" font-family="Sora" font-size="10">${n.val}</text>`).join('');
+  return `<svg width="100%" height="100%" viewBox="-50 -50 900 580" xmlns="http://www.w3.org/2000/svg">
+    <defs><radialGradient id="mmglow"><stop offset="0%" stop-color="${accent}" stop-opacity="0.12"/><stop offset="100%" stop-color="${accent}" stop-opacity="0"/></radialGradient></defs>
+    <circle cx="400" cy="250" r="115" fill="url(#mmglow)"/>
+    <rect x="298" y="212" width="204" height="76" rx="12" fill="#161624" stroke="${accent}" stroke-width="1.5"/>
+    <text x="400" y="240" text-anchor="middle" fill="${accent}" font-family="Sora" font-size="12" font-weight="700">${m.mapCenter}</text>
+    <text x="400" y="258" text-anchor="middle" fill="#6b6b90" font-family="Sora" font-size="10">${m.mapCenterSub}</text>
+    <text x="400" y="276" text-anchor="middle" fill="#6b6b90" font-family="Sora" font-size="10">${statusLabel}</text>
+    ${nodesHtml}
+    <rect x="618" y="460" width="165" height="70" rx="7" fill="#0f0f1a" stroke="#252538" stroke-width="1"/>
+    <text x="700" y="479" text-anchor="middle" fill="#6b6b90" font-family="Sora" font-size="9" font-weight="600">LEGEND</text>
+    <circle cx="634" cy="493" r="3" fill="#3dffc0"/><text x="643" y="497" fill="#6b6b90" font-family="Sora" font-size="9">Discussed</text>
+    <circle cx="703" cy="493" r="3" fill="#6b6b90"/><text x="712" y="497" fill="#6b6b90" font-family="Sora" font-size="9">Pending</text>
+    <circle cx="634" cy="511" r="3" fill="#ff6b6b"/><text x="643" y="515" fill="#6b6b90" font-family="Sora" font-size="9">Warning</text>
+  </svg>`;
+}
+
+// ═══════════════════════════════════════════════════════
+// RENDER: CONVERSATION (Setup chat)
+// ═══════════════════════════════════════════════════════
+
+function renderConv(id) {
+  const c = CONVS[id];
+  if (!c) return;
+
+  document.getElementById('conv-title-header').textContent = c.title;
+  document.getElementById('conv-sub-header').textContent   = c.sub;
+
+  const msgs = document.getElementById('chat-messages');
+  msgs.innerHTML = '';
+
+  c.messages.forEach(msg => {
+    const row = document.createElement('div');
+
+    if (msg.type === 'user') {
+      row.className = 'msg-row user';
+      row.innerHTML = `<div class="msg-content"><div class="msg-bubble user">${msg.content}</div><div class="msg-time">${msg.time}</div></div><div class="msg-avatar user-av">DT</div>`;
+
+    } else if (msg.type === 'bot') {
+      row.className = 'msg-row';
+      row.innerHTML = `<div class="msg-avatar bot">🧠</div><div class="msg-content"><div class="msg-bubble bot">${msg.content}</div><div class="msg-time">${msg.time}</div></div>`;
+
+    } else if (msg.type === 'bot-agents') {
+      const agentsHtml = msg.agents.map(a => {
+        const isChecked = a.checked !== false;
+        return `
+        <div class="agent-suggest-row ${isChecked ? 'checked' : ''}">
+          <div class="agent-check ${isChecked ? 'on' : ''}" onclick="toggleAgent(this)">${isChecked ? '✓' : ''}</div>
+          <div class="agent-emoji">${a.icon}</div>
+          <div class="agent-suggest-info">
+            <div class="agent-suggest-name">${a.name}</div>
+            <div class="agent-suggest-desc">${a.desc}</div>
+          </div>
+        </div>`;
+      }).join('');
+      const alreadyCreated = meetingCreatedFlags[msg.meetingId];
+      const btnHtml = alreadyCreated
+        ? `<button class="start-meeting-btn created" id="${msg.btnId}" onclick="openMeetingById('${msg.meetingId}')">→ Vào Meeting</button>`
+        : `<button class="start-meeting-btn" id="${msg.btnId}" onclick="createMeetingFromConv('${msg.btnId}','${msg.meetingId}','${c.id}')">🚀 Bắt đầu Meeting</button>`;
+      row.className = 'msg-row';
+      row.innerHTML = `<div class="msg-avatar bot">🧠</div><div class="msg-content"><div class="msg-bubble bot">${msg.intro}<div class="agent-suggestions">${agentsHtml}</div>${btnHtml}</div><div class="msg-time">${msg.time}</div></div>`;
+
+    } else if (msg.type === 'bot-created') {
+      if (!meetingCreatedFlags[msg.meetingId]) return;
+      const badgesHtml = msg.agents.map(a => `<div class="agent-badge">${a}</div>`).join('');
+      row.className = 'msg-row';
+      row.innerHTML = `<div class="msg-avatar bot">🧠</div><div class="msg-content"><div class="created-meeting-card"><div class="cmc-header"><span class="cmc-badge">✓ Created</span></div><div class="cmc-title">🧠 ${msg.meetingTitle}</div><div class="agent-badges">${badgesHtml}</div><button class="goto-btn" onclick="openMeetingById('${msg.meetingId}')">→ Vào Meeting Room</button></div><div class="msg-time">${msg.time}</div></div>`;
+    }
+
+    msgs.appendChild(row);
+  });
+
+  msgs.scrollTop = msgs.scrollHeight;
+}
+
+function createMeetingFromConv(btnId, meetingId, convId) {
+  meetingCreatedFlags[meetingId] = true;
+  const btn = document.getElementById(btnId);
+  if (btn) { btn.className = 'start-meeting-btn created'; btn.innerHTML = '⏳ Đang tạo...'; }
+  setTimeout(() => {
+    renderConv(convId);
+    setTimeout(() => openMeetingById(meetingId), 600);
+  }, 600);
+}
+
+// ═══════════════════════════════════════════════════════
+// NAVIGATION
+// ═══════════════════════════════════════════════════════
+
+function showScreen(name) {
+  document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+  const target = document.getElementById('screen-' + name);
+  if (target) target.classList.add('active');
+
+  document.querySelectorAll('.conv-item, .meeting-item').forEach(i => i.classList.remove('active'));
+  document.querySelectorAll('.sb-footer-item').forEach(i => i.classList.remove('active'));
+
+  if (name === 'history')  document.getElementById('nav-history')?.classList.add('active');
+  if (name === 'settings') document.getElementById('nav-settings')?.classList.add('active');
+  if (name === 'setup' && lastActiveConv) lastActiveConv.classList.add('active');
+  if (name === 'setup' && !lastActiveConv) {
+    const first = document.querySelector('.conv-item');
+    if (first) { lastActiveConv = first; first.classList.add('active'); renderConv(first.dataset.convId); }
+  }
+}
+
+function openConv(el) {
+  lastActiveConv = el;
+  document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+  document.getElementById('screen-setup').classList.add('active');
+  document.querySelectorAll('.conv-item, .meeting-item').forEach(i => i.classList.remove('active'));
+  document.querySelectorAll('.sb-footer-item').forEach(i => i.classList.remove('active'));
+  el.classList.add('active');
+  renderConv(el.dataset.convId);
+}
+
+function openMeeting(el) {
+  document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+  document.getElementById('screen-meeting').classList.add('active');
+  document.querySelectorAll('.conv-item, .meeting-item').forEach(i => i.classList.remove('active'));
+  document.querySelectorAll('.sb-footer-item').forEach(i => i.classList.remove('active'));
+  el.classList.add('active');
+
+  // Reset to Chat tab
+  document.querySelectorAll('.view-tab').forEach(t => t.classList.remove('active'));
+  document.querySelectorAll('.view-tab')[0].classList.add('active');
+  document.getElementById('view-chat').style.display = 'flex';
+  document.getElementById('view-mindmap').style.display = 'none';
+
+  renderMeeting(el.dataset.meetingId);
+}
+
+function openMeetingById(id) {
+  const el = document.querySelector(`[data-meeting-id="${id}"]`);
+  if (el) {
+    openMeeting(el);
+  } else {
+    // Fallback (e.g. from history page, no sidebar item)
+    document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+    document.getElementById('screen-meeting').classList.add('active');
+    document.querySelectorAll('.view-tab').forEach(t => t.classList.remove('active'));
+    document.querySelectorAll('.view-tab')[0].classList.add('active');
+    document.getElementById('view-chat').style.display = 'flex';
+    document.getElementById('view-mindmap').style.display = 'none';
+    renderMeeting(id);
+  }
+}
+
+// ═══════════════════════════════════════════════════════
+// MEETING ROOM INTERACTIONS
+// ═══════════════════════════════════════════════════════
+
+function switchView(view, btn) {
+  document.querySelectorAll('.view-tab').forEach(t => t.classList.remove('active'));
+  btn.classList.add('active');
+  document.getElementById('view-chat').style.display    = view === 'chat'    ? 'flex' : 'none';
+  document.getElementById('view-mindmap').style.display = view === 'mindmap' ? 'flex' : 'none';
+  if (view === 'mindmap' && currentMeetingId) {
+    document.getElementById('mindmap-container').innerHTML = buildMindmap(MEETINGS[currentMeetingId]);
+  }
+}
+
+function toggleThinking(el) {
+  el.classList.toggle('open');
+  el.nextElementSibling.classList.toggle('open');
+}
+
+function toggleAgent(el) {
+  el.classList.toggle('on');
+  el.closest('.agent-suggest-row').classList.toggle('checked');
+  el.textContent = el.classList.contains('on') ? '✓' : '';
+}
+
+function sendMeetingMsg() {
+  const ta  = document.getElementById('meeting-input');
+  const val = ta?.value?.trim();
+  if (!val) return;
+  const feed = document.getElementById('discussion-feed');
+
+  // User message
+  const userRow = document.createElement('div');
+  userRow.className = 'discussion-msg';
+  userRow.style.cssText = 'display:flex;justify-content:flex-end';
+  userRow.innerHTML = `<div style="max-width:460px"><div class="d-bubble user-msg">${escapeHtml(val)}</div><div style="text-align:right;color:var(--text-dim);font-size:10px;margin-top:4px">Just now</div></div>`;
+  feed.appendChild(userRow);
+  ta.value = ''; ta.style.height = 'auto';
+  feed.scrollTop = feed.scrollHeight;
+
+  // Agent response
+  const agents = MEETINGS[currentMeetingId]?.sendAgents || [{icon:'🧠', name:'Agent', role:'perspective'}];
+  const agent  = agents[Math.floor(Math.random() * agents.length)];
+  setTimeout(() => {
+    const tRow = document.createElement('div');
+    tRow.className = 'discussion-msg';
+    tRow.innerHTML = `<div class="discussion-msg-header"><span class="d-agent-icon">${agent.icon}</span><div><div class="d-agent-name">${agent.name}</div><div class="d-agent-role">${agent.role}</div></div><div class="d-time">Just now</div></div><div class="typing-indicator"><div class="typing-dot"></div><div class="typing-dot"></div><div class="typing-dot"></div></div>`;
+    feed.appendChild(tRow); feed.scrollTop = feed.scrollHeight;
+    const replies = [
+      'Góc nhìn quan trọng! Điều này ảnh hưởng trực tiếp đến quyết định — cần cân nhắc kỹ hơn về trade-offs.',
+      'Tôi đồng ý một phần. Nhưng cần bổ sung: trong bối cảnh này có một constraint quan trọng chưa được xét đến.',
+      'Cảm ơn bạn đã nêu! Từ góc độ của tôi, đây là trade-off giữa speed-to-market và long-term maintainability.',
+      'Đúng vậy. Tôi muốn raise thêm: nếu chọn hướng đó có những rủi ro downstream cần được addressed sớm.',
+    ];
+    setTimeout(() => {
+      const typing = tRow.querySelector('.typing-indicator');
+      if (typing) typing.outerHTML = `<div class="d-bubble">${replies[Math.floor(Math.random()*replies.length)]}</div>`;
+      feed.scrollTop = feed.scrollHeight;
+    }, 1400);
+  }, 700);
+}
+
+// ═══════════════════════════════════════════════════════
+// SETUP CHAT SEND
+// ═══════════════════════════════════════════════════════
+
+function sendSetupMsg() {
+  const ta  = document.getElementById('setup-input');
+  const val = ta.value.trim();
+  if (!val) return;
+  const msgs = document.getElementById('chat-messages');
+
+  const row = document.createElement('div');
+  row.className = 'msg-row user';
+  row.innerHTML = `<div class="msg-content"><div class="msg-bubble user">${escapeHtml(val)}</div><div class="msg-time">Just now</div></div><div class="msg-avatar user-av">DT</div>`;
+  msgs.appendChild(row);
+  ta.value = ''; ta.style.height = 'auto';
+
+  const tRow = document.createElement('div');
+  tRow.className = 'msg-row';
+  tRow.innerHTML = `<div class="msg-avatar bot">🧠</div><div class="msg-content"><div class="typing-indicator"><div class="typing-dot"></div><div class="typing-dot"></div><div class="typing-dot"></div></div></div>`;
+  msgs.appendChild(tRow); msgs.scrollTop = msgs.scrollHeight;
+
+  setTimeout(() => {
+    msgs.removeChild(tRow);
+    const replies = [
+      'Chủ đề thú vị! Bạn muốn tôi gợi ý thêm agents không, hay sẵn sàng bắt đầu meeting với lineup hiện tại?',
+      'Tôi hiểu rồi. Có thể bạn cần thêm 😈 Devil\'s Advocate để phản biện các luận điểm — muốn thêm không?',
+      'Ghi nhận! Tôi sẽ cập nhật context cho tất cả agents trước khi bắt đầu meeting.',
+      'Hay đấy! Góc nhìn đó rất quan trọng. Bạn muốn điều chỉnh agent lineup không?',
+    ];
+    const rRow = document.createElement('div');
+    rRow.className = 'msg-row';
+    rRow.innerHTML = `<div class="msg-avatar bot">🧠</div><div class="msg-content"><div class="msg-bubble bot">${replies[Math.floor(Math.random()*replies.length)]}</div><div class="msg-time">Just now</div></div>`;
+    msgs.appendChild(rRow); msgs.scrollTop = msgs.scrollHeight;
+  }, 1100);
+}
+
+// ═══════════════════════════════════════════════════════
+// SETTINGS
+// ═══════════════════════════════════════════════════════
+
+function selectModel(el) {
+  document.querySelectorAll('.settings-select-opt').forEach(o => {
+    o.classList.remove('selected');
+    const t = o.querySelector('.tag');
+    if (t) { t.className = 'tag tag-purple'; t.textContent = 'Pro'; }
+  });
+  el.classList.add('selected');
+  let tag = el.querySelector('.tag');
+  if (!tag) { tag = document.createElement('span'); el.appendChild(tag); }
+  tag.className = 'tag tag-green'; tag.textContent = 'Active';
+}
+
+function selectAccent(el, color) {
+  document.querySelectorAll('.color-swatch').forEach(s => s.classList.remove('active'));
+  el.classList.add('active');
+  document.documentElement.style.setProperty('--accent', color);
+  const hex = color.replace('#','');
+  const r = parseInt(hex.slice(0,2),16), g = parseInt(hex.slice(2,4),16), b = parseInt(hex.slice(4,6),16);
+  document.documentElement.style.setProperty('--accent-dim',  `rgba(${r},${g},${b},0.12)`);
+  document.documentElement.style.setProperty('--accent-glow', `rgba(${r},${g},${b},0.25)`);
+}
+
+// ═══════════════════════════════════════════════════════
+// UTILS
+// ═══════════════════════════════════════════════════════
+
+function escapeHtml(str) {
+  return str.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+
+document.addEventListener('keydown', e => {
+  if (e.key !== 'Enter' || e.shiftKey) return;
+  const active = document.querySelector('.screen.active');
+  if (!active) return;
+  if (active.id === 'screen-setup'   && document.activeElement === document.getElementById('setup-input'))   { e.preventDefault(); sendSetupMsg(); }
+  if (active.id === 'screen-meeting' && document.activeElement === document.getElementById('meeting-input')) { e.preventDefault(); sendMeetingMsg(); }
+});
+
+// ─── Init ───────────────────────────────────────────────
+(function init() {
+  // All 3 meetings already exist (seeded data)
+  meetingCreatedFlags['m1'] = true;
+  meetingCreatedFlags['m2'] = true;
+  meetingCreatedFlags['m3'] = true;
+
+  // Load first conv
+  const firstConv = document.querySelector('.conv-item');
+  if (firstConv) {
+    lastActiveConv = firstConv;
+    firstConv.classList.add('active');
+    renderConv(firstConv.dataset.convId);
+  }
+})();
+</script>
+</body>
+</html>
