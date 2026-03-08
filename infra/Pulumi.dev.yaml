@@ -1,0 +1,17 @@
+config:
+  # Reference to the GKE infrastructure stack
+  mindpool-infra:infraStackRef: dongitran/gcp-infra/dev
+  # Replica count
+  mindpool-infra:apiReplicas: "1"
+  mindpool-infra:webReplicas: "1"
+
+# Docker images — set automatically by GitHub Actions on each deploy
+# mindpool-infra:apiImage: gcr.io/<project>/mindpool-api:<sha>
+# mindpool-infra:webImage: gcr.io/<project>/mindpool-web:<sha>
+
+# Secrets — stored encrypted in Pulumi Cloud, set via GitHub Actions.
+# To set manually: pulumi config set --secret <key> <value> --stack dongitran/mindpool-infra/dev
+# mindpool-infra:mongodbUrl:      (secret)
+# mindpool-infra:redisUrl:        (secret)
+# mindpool-infra:kimiApiKey:      (secret)
+# mindpool-infra:minimaxApiKey:   (secret)

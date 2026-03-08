@@ -1,0 +1,17 @@
+{
+    "name": "mindpool-infra",
+    "version": "1.0.0",
+    "private": true,
+    "scripts": {
+        "deploy": "pulumi up --yes --stack dongitran/mindpool-infra/dev",
+        "preview": "pulumi preview --stack dongitran/mindpool-infra/dev",
+        "destroy": "pulumi destroy --yes --stack dongitran/mindpool-infra/dev"
+    },
+    "dependencies": {
+        "@pulumi/kubernetes": "^4.25.0",
+        "@pulumi/pulumi": "^3.113.0"
+    },
+    "devDependencies": {
+        "typescript": "^5.0.0"
+    }
+}
