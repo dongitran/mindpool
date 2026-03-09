@@ -38,6 +38,6 @@ export class LLMRouter {
   }
 
   getConfig(): RouterConfig {
-    return { ...this.config };
+    return structuredClone(this.config);
   }
 }

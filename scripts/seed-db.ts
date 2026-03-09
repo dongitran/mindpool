@@ -57,6 +57,57 @@ async function seed() {
   });
   console.log('Seeded default settings');
 
+  // Seed 2 demo pools (completed) so History screen has content on fresh install
+  const poolsCollection = db.collection('pools');
+  const twoWeeksAgo = new Date(Date.now() - 14 * 24 * 60 * 60 * 1000);
+  const threeDaysAgo = new Date(Date.now() - 3 * 24 * 60 * 60 * 1000);
+
+  await poolsCollection.insertMany([
+    {
+      title: 'Nên build mobile app hay web app trước?',
+      topic: 'Chiến lược phát triển sản phẩm: mobile-first hay web-first cho startup early-stage',
+      status: 'completed',
+      agents: [
+        { agentId: agentIds[1].toString(), icon: '💼', name: 'Business Strategist', role: 'Chiến lược kinh doanh', state: 'listening', queuePosition: null },
+        { agentId: agentIds[2].toString(), icon: '👨‍💻', name: 'Software Engineer', role: 'Kỹ thuật & khả thi', state: 'listening', queuePosition: null },
+        { agentId: agentIds[3].toString(), icon: '🎨', name: 'UX Designer', role: 'Trải nghiệm người dùng', state: 'listening', queuePosition: null },
+        { agentId: agentIds[9].toString(), icon: '📈', name: 'Market Analyst', role: 'Phân tích thị trường', state: 'listening', queuePosition: null },
+      ],
+      messages: [],
+      queue: [],
+      statusText: 'Đã kết thúc',
+      duration: '8 phút',
+      sendAgents: [],
+      mapCenter: 'Mobile vs Web',
+      mapCenterSub: 'Chiến lược ra mắt',
+      mapNodes: [],
+      createdAt: twoWeeksAgo,
+      updatedAt: twoWeeksAgo,
+    },
+    {
+      title: 'Pricing strategy cho SaaS B2B',
+      topic: 'Xác định mô hình pricing phù hợp cho sản phẩm SaaS B2B giai đoạn early-stage',
+      status: 'completed',
+      agents: [
+        { agentId: agentIds[1].toString(), icon: '💼', name: 'Business Strategist', role: 'Chiến lược kinh doanh', state: 'listening', queuePosition: null },
+        { agentId: agentIds[5].toString(), icon: '📊', name: 'Data Scientist', role: 'Dữ liệu & số liệu', state: 'listening', queuePosition: null },
+        { agentId: agentIds[7].toString(), icon: '✨', name: 'Creative Director', role: 'Thương hiệu & câu chuyện', state: 'listening', queuePosition: null },
+        { agentId: agentIds[10].toString(), icon: '😈', name: "Devil's Advocate", role: 'Phản biện', state: 'listening', queuePosition: null },
+      ],
+      messages: [],
+      queue: [],
+      statusText: 'Đã kết thúc',
+      duration: '12 phút',
+      sendAgents: [],
+      mapCenter: 'SaaS Pricing',
+      mapCenterSub: 'B2B Early-stage',
+      mapNodes: [],
+      createdAt: threeDaysAgo,
+      updatedAt: threeDaysAgo,
+    },
+  ]);
+  console.log('Seeded 2 demo pools');
+
   console.log('Seed complete!');
   await mongoose.disconnect();
 }
