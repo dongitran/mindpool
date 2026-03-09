@@ -1,4 +1,6 @@
 import { create } from 'zustand';
+import type { Pool } from '@mindpool/shared';
+import type { Conversation } from '@mindpool/shared';
 
 export type Screen = 'welcome' | 'setup' | 'meeting' | 'history' | 'settings';
 
@@ -6,14 +8,14 @@ interface AppState {
   currentScreen: Screen;
   currentConversationId: string | null;
   currentMeetingId: string | null;
-  conversations: any[];
-  pools: any[];
+  conversations: Conversation[];
+  pools: Pool[];
 
   setScreen: (screen: Screen) => void;
   setCurrentConversation: (id: string | null) => void;
   setCurrentMeeting: (id: string | null) => void;
-  setConversations: (conversations: any[]) => void;
-  setPools: (pools: any[]) => void;
+  setConversations: (conversations: Conversation[]) => void;
+  setPools: (pools: Pool[]) => void;
   navigateToMeeting: (meetingId: string) => void;
   navigateToSetup: (conversationId?: string) => void;
 }

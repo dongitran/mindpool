@@ -99,4 +99,7 @@ const PoolSchema = new Schema(
   { timestamps: true }
 );
 
+PoolSchema.index({ updatedAt: -1 });
+PoolSchema.index({ status: 1 });
+
 export const Pool = mongoose.model<PoolDocument>('Pool', PoolSchema);

@@ -1,4 +1,5 @@
 import { create } from 'zustand';
+import type { Pool } from '@mindpool/shared';
 
 interface MeetingMessage {
   type: 'agent' | 'user' | 'mindx' | 'typing';
@@ -14,13 +15,13 @@ interface MeetingMessage {
 
 interface MeetingState {
   currentPoolId: string | null;
-  pool: any | null;
+  pool: Pool | null;
   messages: MeetingMessage[];
   agentStates: Record<string, string>;
   queue: { agentId: string; position: number }[];
   isLoading: boolean;
 
-  setCurrentPool: (poolId: string, pool: any) => void;
+  setCurrentPool: (poolId: string, pool: Pool) => void;
   addMessage: (message: MeetingMessage) => void;
   updateAgentState: (agentId: string, state: string) => void;
   updateQueue: (queue: { agentId: string; position: number }[]) => void;
@@ -40,7 +41,7 @@ export const useMeetingStore = create<MeetingState>((set) => ({
     set({
       currentPoolId: poolId,
       pool,
-      messages: pool?.messages || [],
+      messages: [],
       isLoading: false,
     }),
   addMessage: (message) =>

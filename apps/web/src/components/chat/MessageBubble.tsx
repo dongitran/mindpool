@@ -1,3 +1,4 @@
+import DOMPurify from 'dompurify';
 import { AgentSuggestion } from './AgentSuggestion';
 
 interface MessageProps {
@@ -52,7 +53,7 @@ export function MessageBubble({
         <div className="max-w-[520px]">
           <div
             className="px-4 py-[11px] rounded-[14px] rounded-tl bg-[var(--surface-2)] border border-[var(--border)] text-[var(--text)] text-[13.5px] leading-relaxed"
-            dangerouslySetInnerHTML={{ __html: message.content || '' }}
+            dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(message.content || '') }}
           />
           <div className="text-[10px] text-[var(--text-dim)] mt-1 px-1">
             {message.time}
@@ -70,7 +71,7 @@ export function MessageBubble({
         </div>
         <div className="max-w-[520px]">
           <div className="px-4 py-[11px] rounded-[14px] rounded-tl bg-[var(--surface-2)] border border-[var(--border)] text-[var(--text)] text-[13.5px] leading-relaxed">
-            <span dangerouslySetInnerHTML={{ __html: message.intro || '' }} />
+            <span dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(message.intro || '') }} />
             <AgentSuggestion
               agents={message.agents || []}
               meetingId={message.meetingId || ''}

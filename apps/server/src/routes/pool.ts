@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import * as poolService from '../services/pool.service';
 import * as mindxService from '../services/mindx.service';
+import { logger } from '../lib/logger';
 
 const router = Router();
 
@@ -34,7 +35,7 @@ router.post('/pool/create', async (req, res, next) => {
 
     // Kick off the first turn
     mindxService.handleMeetingLoop(pool._id.toString()).catch((err) => {
-      console.error('[Pool] Meeting loop error:', err);
+      logger.error('Meeting loop error', { error: err });
     });
 
     res.status(201).json(pool);
@@ -95,7 +96,7 @@ router.post('/pool/:id/message', async (req, res, next) => {
 
     // Trigger next round of the meeting loop
     mindxService.handleMeetingLoop(poolId).catch((err) => {
-      console.error('[Pool] Meeting loop error:', err);
+      logger.error('Meeting loop error', { error: err });
     });
 
     res.json(message);

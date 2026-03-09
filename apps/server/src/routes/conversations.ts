@@ -2,6 +2,7 @@ import { Router } from 'express';
 import { Conversation } from '../models';
 import { llmRouter } from '../services/mindx.service';
 import type { ChatMessage } from '@mindpool/shared';
+import { logger } from '../lib/logger';
 
 const router = Router();
 
@@ -114,7 +115,7 @@ router.post('/:id/message', async (req, res, next) => {
         content: replyContent,
       });
     } catch (llmError) {
-      console.error('[Conversation] LLM error:', llmError);
+      logger.error('LLM error in conversation', { error: llmError });
       const replyTime = new Date().toLocaleTimeString('vi-VN', {
         hour: '2-digit',
         minute: '2-digit',

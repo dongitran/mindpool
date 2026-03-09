@@ -12,7 +12,7 @@ export function useMeeting(poolId: string | null) {
   // Load pool data
   useEffect(() => {
     if (!poolId) return;
-    api.getPool(poolId).then((pool: any) => {
+    api.getPool(poolId).then((pool) => {
       store.setCurrentPool(poolId, pool);
     });
   }, [poolId]);

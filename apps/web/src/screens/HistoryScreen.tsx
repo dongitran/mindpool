@@ -29,8 +29,8 @@ export function HistoryScreen() {
   const [pools, setPools] = useState<PoolCard[]>([]);
 
   useEffect(() => {
-    api.getPools().then((data: any) => {
-      setPools(Array.isArray(data) ? data : []);
+    api.getPools().then((data) => {
+      setPools(Array.isArray(data) ? (data as PoolCard[]) : []);
     }).catch(() => setPools([]));
   }, []);
 

@@ -20,4 +20,6 @@ const MessageSchema = new Schema({
   timestamp: { type: Date, default: Date.now },
 });
 
+MessageSchema.index({ poolId: 1, timestamp: 1 });
+
 export const Message = mongoose.model<MessageDocument>('Message', MessageSchema);

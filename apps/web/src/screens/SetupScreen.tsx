@@ -27,10 +27,10 @@ export function SetupScreen() {
 
   useEffect(() => {
     if (currentConversationId) {
-      api.getConversation(currentConversationId).then((conv: any) => {
+      api.getConversation(currentConversationId).then((conv) => {
         setTitle(conv.title || 'MindX');
         setSub(conv.sub || '');
-        setMessages(conv.messages || []);
+        setMessages((conv.messages as ConvMessage[]) || []);
       }).catch(() => {
         // New conversation — show greeting
         setMessages([{

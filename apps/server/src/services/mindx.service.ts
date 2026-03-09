@@ -6,6 +6,7 @@ import { StopSignalDetector } from '../queue/StopSignalDetector';
 import { config } from '../config';
 import { Pool, Agent, Message } from '../models';
 import * as poolService from './pool.service';
+import { logger } from '../lib/logger';
 
 // Initialize LLM router from env config
 const routerConfig: RouterConfig = {
@@ -137,7 +138,7 @@ export async function runRelevanceCheck(
     const answer = typeof result === 'string' ? result : '';
     return answer.toLowerCase().trim().startsWith('yes');
   } catch (error) {
-    console.error('[MindX] Relevance check failed:', error);
+    logger.error('Relevance check failed', { agentId, error });
     return false;
   }
 }
@@ -145,7 +146,7 @@ export async function runRelevanceCheck(
 export async function generateWrapUp(
   poolId: string
 ): Promise<string> {
-  const pool = await Pool.findById(poolId).populate('messages');
+  const pool = await Pool.findById(poolId);
   if (!pool) throw new Error('Pool not found');
 
   const messages = await Message.find({ poolId }).sort({ timestamp: 1 });
@@ -180,7 +181,7 @@ export async function generateWrapUp(
 
     return wrapUp;
   } catch (error) {
-    console.error('[MindX] Wrap-up generation failed:', error);
+    logger.error('Wrap-up generation failed', { poolId, error });
     const fallback = 'Cuộc thảo luận đã kết thúc. Cảm ơn các chuyên gia đã tham gia!';
     await poolService.addMessage(poolId, {
       agentId: 'mindx',
@@ -211,29 +212,36 @@ export async function handleMeetingLoop(poolId: string): Promise<void> {
     .map((m) => `[${m.agentId}]: ${m.content}`)
     .join('\n');
 
+  // Collect all relevant agentIds then fetch in one DB call (avoids N+1)
+  const listeningAgentIds = pool.agents
+    .filter((a) => a.state === 'listening' && a.agentId !== latestMessage.agentId)
+    .map((a) => a.agentId);
+
+  const nextAgentId = queueManager.popFromQueue();
+  const allNeededIds = [...new Set([...listeningAgentIds, ...(nextAgentId ? [nextAgentId] : [])])];
+  const agentDocs = await Agent.find({ _id: { $in: allNeededIds } });
+  const agentMap = new Map(agentDocs.map((a) => [a._id.toString(), a]));
+
   // Run relevance check for each listening agent
-  for (const agentRef of pool.agents) {
-    if (agentRef.state === 'listening' && agentRef.agentId !== latestMessage.agentId) {
-      const agentDoc = await Agent.findById(agentRef.agentId);
-      if (!agentDoc) continue;
+  for (const agentId of listeningAgentIds) {
+    const agentDoc = agentMap.get(agentId);
+    if (!agentDoc) continue;
 
-      const shouldSpeak = await runRelevanceCheck(
-        agentRef.agentId,
-        agentDoc.specialty,
-        latestMessage.content,
-        poolContext
-      );
+    const shouldSpeak = await runRelevanceCheck(
+      agentId,
+      agentDoc.specialty,
+      latestMessage.content,
+      poolContext
+    );
 
-      if (shouldSpeak) {
-        queueManager.addToQueue(agentRef.agentId);
-      }
+    if (shouldSpeak) {
+      queueManager.addToQueue(agentId);
     }
   }
 
   // Process queue: let next agent speak
-  const nextAgentId = queueManager.popFromQueue();
   if (nextAgentId) {
-    const agentDoc = await Agent.findById(nextAgentId);
+    const agentDoc = agentMap.get(nextAgentId);
     if (agentDoc) {
       // Build conversation history for the agent
       const history = latestMessages.reverse().map((m) => ({
@@ -264,7 +272,7 @@ export async function handleMeetingLoop(poolId: string): Promise<void> {
           thinkSec,
         });
       } catch (error) {
-        console.error(`[MindX] Agent ${agentDoc.name} failed to respond:`, error);
+        logger.error('Agent failed to respond', { agent: agentDoc.name, poolId, error });
       }
     }
   }

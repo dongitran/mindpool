@@ -1,3 +1,5 @@
+import type { Pool, Conversation } from '@mindpool/shared';
+
 const API_BASE = '/api';
 
 async function request<T>(url: string, options?: RequestInit): Promise<T> {
@@ -12,38 +14,38 @@ async function request<T>(url: string, options?: RequestInit): Promise<T> {
 export const api = {
   // Conversations
   createConversation: () =>
-    request('/conversations', { method: 'POST' }),
+    request<Conversation>('/conversations', { method: 'POST' }),
   getConversations: () =>
-    request('/conversations'),
+    request<Conversation[]>('/conversations'),
   getConversation: (id: string) =>
-    request(`/conversations/${id}`),
+    request<Conversation>(`/conversations/${id}`),
   sendConversationMessage: (id: string, content: string) =>
-    request(`/conversations/${id}/message`, {
+    request<{ message: Conversation['messages'][number] }>(`/conversations/${id}/message`, {
       method: 'POST',
       body: JSON.stringify({ content }),
     }),
 
   // Pools
   createPool: (topic: string, agentIds: string[], conversationId: string) =>
-    request('/pool/create', {
+    request<Pool>('/pool/create', {
       method: 'POST',
       body: JSON.stringify({ topic, agentIds, conversationId }),
     }),
   getPool: (id: string) =>
-    request(`/pool/${id}`),
+    request<Pool>(`/pool/${id}`),
   getPools: () =>
-    request('/pools'),
+    request<Pool[]>('/pools'),
   sendPoolMessage: (id: string, content: string) =>
-    request(`/pool/${id}/message`, {
+    request<{ _id: string; content: string; agentId: string; timestamp: string }>(`/pool/${id}/message`, {
       method: 'POST',
       body: JSON.stringify({ content }),
     }),
 
   // Settings
   getSettings: () =>
-    request('/settings'),
+    request<Record<string, unknown>>('/settings'),
   updateSettings: (settings: Record<string, unknown>) =>
-    request('/settings', {
+    request<Record<string, unknown>>('/settings', {
       method: 'PUT',
       body: JSON.stringify(settings),
     }),

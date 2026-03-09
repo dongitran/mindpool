@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import type { Request, Response } from 'express';
 import { Message } from '../models';
+import { logger } from '../lib/logger';
 
 const router = Router();
 
@@ -54,7 +55,7 @@ router.get('/:poolId', (req: Request<{ poolId: string }>, res: Response) => {
       }
     })
     .catch((err) => {
-      console.error('[SSE] Error fetching messages:', err);
+      logger.error('SSE error fetching messages', { error: err });
     });
 
   // Heartbeat to keep connection alive

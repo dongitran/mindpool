@@ -1,4 +1,5 @@
 import { useEffect, useRef } from 'react';
+import DOMPurify from 'dompurify';
 import { ThinkingBlock } from './ThinkingBlock';
 
 interface FeedMessage {
@@ -127,7 +128,7 @@ export function DiscussionFeed({ messages, showThinkingDefault = false }: Discus
                   ? 'bg-[rgba(61,255,192,0.05)] border border-[rgba(61,255,192,0.2)] border-l-2 border-l-[var(--accent)]'
                   : 'bg-[var(--surface-2)] border border-[var(--border)]'
               }`}
-              dangerouslySetInnerHTML={{ __html: msg.content }}
+              dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(msg.content) }}
             />
           </div>
         );

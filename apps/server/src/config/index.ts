@@ -8,6 +8,7 @@ export const config = {
   redisUrl: process.env.REDIS_URL ?? '',
   kimiApiKey: process.env.KIMI_API_KEY ?? '',
   minimaxApiKey: process.env.MINIMAX_API_KEY ?? '',
+  host: process.env.MINDPOOL_HOST ?? '',
   llmRouting: {
     fullResponse: {
       provider: process.env.LLM_FULL_RESPONSE_PROVIDER ?? '',

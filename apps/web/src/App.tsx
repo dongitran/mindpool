@@ -33,17 +33,17 @@ export default function App() {
   useEffect(() => {
     // Load initial data
     api.getConversations()
-      .then((data: any) => setConversations(Array.isArray(data) ? data : []))
+      .then((data) => setConversations(Array.isArray(data) ? data : []))
       .catch(() => {});
     api.getPools()
-      .then((data: any) => setPools(Array.isArray(data) ? data : []))
+      .then((data) => setPools(Array.isArray(data) ? data : []))
       .catch(() => {});
   }, [setConversations, setPools]);
 
   return (
     <div className="flex h-screen overflow-hidden bg-[var(--bg)] text-[var(--text)]">
       <Sidebar
-        meetings={pools.map((p: any) => ({
+        meetings={pools.map((p) => ({
           _id: p._id,
           title: p.title,
           status: p.status,
@@ -51,7 +51,7 @@ export default function App() {
           duration: p.duration,
           updatedAt: p.updatedAt,
         }))}
-        conversations={conversations.map((c: any) => ({
+        conversations={conversations.map((c) => ({
           _id: c._id,
           title: c.title,
           sub: c.sub || '',
