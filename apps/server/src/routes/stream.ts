@@ -36,8 +36,15 @@ router.get('/:poolId', (req: Request<{ poolId: string }>, res: Response) => {
   }
   poolConnections.get(poolId)!.add(res);
 
-  // Send existing messages
-  Message.find({ poolId })
+  // Send existing messages — support ?after=<ISO timestamp> to avoid replaying
+  // messages the client has already seen (prevents duplicates on reconnect)
+  const afterRaw = req.query.after as string | undefined;
+  const afterDate = afterRaw ? new Date(afterRaw) : null;
+  const msgQuery = afterDate && !isNaN(afterDate.getTime())
+    ? Message.find({ poolId, timestamp: { $gt: afterDate } })
+    : Message.find({ poolId });
+
+  msgQuery
     .sort({ timestamp: 1 })
     .then((messages) => {
       for (const msg of messages) {

@@ -48,7 +48,11 @@ export const api = {
       body: JSON.stringify(settings),
     }),
 
-  // SSE
-  streamPool: (poolId: string) =>
-    new EventSource(`${API_BASE}/stream/${poolId}`),
+  // SSE — pass ?after=<ISO> to skip messages already seen (avoids duplicates on reconnect)
+  streamPool: (poolId: string, after?: string) => {
+    const url = after
+      ? `${API_BASE}/stream/${poolId}?after=${encodeURIComponent(after)}`
+      : `${API_BASE}/stream/${poolId}`;
+    return new EventSource(url);
+  },
 };

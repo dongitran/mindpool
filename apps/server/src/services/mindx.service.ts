@@ -26,6 +26,14 @@ if (config.minimaxApiKey) {
 const poolQueues = new Map<string, QueueManager>();
 const poolStopDetectors = new Map<string, StopSignalDetector>();
 
+// Wrap a promise with a hard timeout
+function withTimeout<T>(promise: Promise<T>, ms: number, label: string): Promise<T> {
+  const timeout = new Promise<never>((_, reject) =>
+    setTimeout(() => reject(new Error(`[MindX] Timeout after ${ms}ms: ${label}`)), ms)
+  );
+  return Promise.race([promise, timeout]);
+}
+
 function getQueueManager(poolId: string): QueueManager {
   if (!poolQueues.has(poolId)) {
     poolQueues.set(poolId, new QueueManager());
@@ -120,10 +128,11 @@ export async function runRelevanceCheck(
       },
     ];
 
-    const result = await llmRouter.agentChat('relevance_check', messages, {
-      maxTokens: 10,
-      temperature: 0.1,
-    });
+    const result = await withTimeout(
+      llmRouter.agentChat('relevance_check', messages, { maxTokens: 10, temperature: 0.1 }),
+      15_000,
+      `relevance_check for agent ${agentId}`
+    );
 
     const answer = typeof result === 'string' ? result : '';
     return answer.toLowerCase().trim().startsWith('yes');
@@ -154,10 +163,11 @@ export async function generateWrapUp(
       { role: 'user', content: transcript },
     ];
 
-    const result = await llmRouter.agentChat('full_response', chatMessages, {
-      maxTokens: 1024,
-      temperature: 0.5,
-    });
+    const result = await withTimeout(
+      llmRouter.agentChat('full_response', chatMessages, { maxTokens: 1024, temperature: 0.5 }),
+      60_000,
+      'generateWrapUp'
+    );
 
     const wrapUp = typeof result === 'string' ? result : 'Cuộc thảo luận đã kết thúc.';
 
@@ -239,10 +249,11 @@ export async function handleMeetingLoop(poolId: string): Promise<void> {
 
       try {
         const startTime = Date.now();
-        const result = await llmRouter.agentChat('full_response', chatMessages, {
-          maxTokens: 2048,
-          temperature: 0.7,
-        });
+        const result = await withTimeout(
+          llmRouter.agentChat('full_response', chatMessages, { maxTokens: 2048, temperature: 0.7 }),
+          120_000,
+          `full_response for agent ${agentDoc.name}`
+        );
 
         const content = typeof result === 'string' ? result : '';
         const thinkSec = (Date.now() - startTime) / 1000;
