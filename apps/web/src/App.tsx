@@ -34,14 +34,14 @@ export default function App() {
     // Load initial data
     api.getConversations()
       .then((data) => setConversations(Array.isArray(data) ? data : []))
-      .catch(() => {});
+      .catch(() => { });
     api.getPools()
       .then((data) => setPools(Array.isArray(data) ? data : []))
-      .catch(() => {});
+      .catch(() => { });
   }, [setConversations, setPools]);
 
   return (
-    <div className="flex h-screen overflow-hidden bg-[var(--bg)] text-[var(--text)]">
+    <div className="flex w-full h-screen overflow-hidden bg-[var(--bg)] text-[var(--text)]">
       <Sidebar
         meetings={pools.map((p) => ({
           _id: p._id,
@@ -58,7 +58,7 @@ export default function App() {
           meetings: [],
         }))}
       />
-      <main className="flex-1 flex flex-col overflow-hidden">
+      <main className="flex-1 min-w-0 flex flex-col overflow-hidden">
         <CurrentScreen />
       </main>
     </div>
