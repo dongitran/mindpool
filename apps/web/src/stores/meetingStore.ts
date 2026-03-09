@@ -45,7 +45,16 @@ export const useMeetingStore = create<MeetingState>((set) => ({
       isLoading: false,
     }),
   addMessage: (message) =>
-    set((s) => ({ messages: [...s.messages, message] })),
+    set((s) => {
+      // When an actual agent message arrives, remove the typing indicator for that agent
+      if (message.type === 'agent' && message.agentId) {
+        const filtered = s.messages.filter(
+          (m) => !(m.type === 'typing' && m.agentId === message.agentId)
+        );
+        return { messages: [...filtered, message] };
+      }
+      return { messages: [...s.messages, message] };
+    }),
   updateAgentState: (agentId, state) =>
     set((s) => ({ agentStates: { ...s.agentStates, [agentId]: state } })),
   updateQueue: (queue) => set({ queue }),

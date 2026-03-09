@@ -7,7 +7,7 @@ import { config } from '../config';
 import { Pool, Agent, Message } from '../models';
 import * as poolService from './pool.service';
 import { logger } from '../lib/logger';
-import { redis, POOL_LOCK_TTL_SEC } from '../lib/redis';
+import { redis, POOL_LOCK_TTL_SEC, MEETING_QUEUE_KEY } from '../lib/redis';
 import { sendSSEToPool } from '../lib/pubsub';
 
 // Initialize LLM router from env config
@@ -225,18 +225,24 @@ export async function handleMeetingLoop(poolId: string): Promise<void> {
     const agentDocs = await Agent.find({ _id: { $in: allNeededIds } });
     const agentMap = new Map(agentDocs.map((a) => [a._id.toString(), a]));
 
-    // Relevance checks: which listening agents should join the queue?
-    for (const agentId of listeningAgentIds) {
-      const agentDoc = agentMap.get(agentId);
-      if (!agentDoc) continue;
+    // Relevance checks in parallel: which listening agents should join the queue?
+    const relevanceResults = await Promise.allSettled(
+      listeningAgentIds.map(async (agentId) => {
+        const agentDoc = agentMap.get(agentId);
+        if (!agentDoc) return { agentId, shouldSpeak: false };
+        const shouldSpeak = await runRelevanceCheck(
+          agentId,
+          agentDoc.specialty,
+          latestMessage.content,
+          poolContext
+        );
+        return { agentId, shouldSpeak };
+      })
+    );
 
-      const shouldSpeak = await runRelevanceCheck(
-        agentId,
-        agentDoc.specialty,
-        latestMessage.content,
-        poolContext
-      );
-
+    for (const result of relevanceResults) {
+      if (result.status !== 'fulfilled') continue;
+      const { agentId, shouldSpeak } = result.value;
       if (shouldSpeak && queueManager.addToQueue(agentId)) {
         await poolService.updateAgentState(poolId, agentId, 'queued');
         await sendSSEToPool(poolId, { type: 'agent_state', agentId, state: 'queued' });
@@ -322,6 +328,10 @@ export async function handleMeetingLoop(poolId: string): Promise<void> {
       // Cleanup in-memory state
       poolQueues.delete(poolId);
       poolStopDetectors.delete(poolId);
+    } else if (queueManager.getSize() > 0) {
+      // Re-enqueue so the next agent in the queue gets to speak
+      await redis.rpush(MEETING_QUEUE_KEY, JSON.stringify({ poolId }));
+      logger.info('[MindX] Re-enqueued meeting loop for next turn', { poolId, queueSize: queueManager.getSize() });
     }
   } finally {
     // Always release lock

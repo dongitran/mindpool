@@ -29,6 +29,7 @@ export function useSSE(poolId: string | null) {
               }
               break;
             case 'mindx_announce':
+              lastTimestampRef.current = now;
               addMessage({
                 type: 'mindx',
                 icon: '🧠',
@@ -54,6 +55,7 @@ export function useSSE(poolId: string | null) {
               // Update last typing message with thinking content
               break;
             case 'agent_message':
+              lastTimestampRef.current = now;
               addMessage({
                 type: 'agent',
                 agentId: data.agentId,
