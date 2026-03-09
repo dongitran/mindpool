@@ -19,16 +19,16 @@ React 19 + Vite + TypeScript + Zustand + TailwindCSS + Framer Motion
 
 ## Key Patterns
 - SSE via EventSource for real-time meeting updates
-- `useSSE` tracks `lastTimestampRef` → reconnect với `?after=<ISO>` để tránh duplicate messages
+- `useSSE` tracks `lastTimestampRef` → reconnects with `?after=<ISO>` to avoid duplicate messages on reconnect
 - Zustand stores as single source of truth
 - CSS custom properties for dynamic theming (accent color)
 
 ## Type Safety
-- API return types được define tại `src/lib/api.ts` — dùng generic `request<Pool>()`, `request<Conversation[]>()`
-- `appStore`: `pools: Pool[]`, `conversations: Conversation[]` từ `@mindpool/shared`
-- `meetingStore`: `pool: Pool | null` — **không dùng any**
-- `meetingStore.messages` là `MeetingMessage[]` (display objects, đến từ SSE) — **không phải** `Pool.messages` (string IDs)
+- API return types are defined in `src/lib/api.ts` — use generics: `request<Pool>()`, `request<Conversation[]>()`
+- `appStore`: `pools: Pool[]`, `conversations: Conversation[]` from `@mindpool/shared`
+- `meetingStore`: `pool: Pool | null` — **never use `any`**
+- `meetingStore.messages` is `MeetingMessage[]` (display objects from SSE) — **not** `Pool.messages` (string IDs)
 
 ## Security
-- Tất cả `dangerouslySetInnerHTML` **phải** wrap qua `DOMPurify.sanitize()` trước khi render
+- All `dangerouslySetInnerHTML` **must** be wrapped with `DOMPurify.sanitize()` before rendering
 - Import: `import DOMPurify from 'dompurify'`

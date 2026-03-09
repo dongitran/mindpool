@@ -25,16 +25,16 @@ Express + TypeScript + Mongoose + ioredis
 See `packages/shared/types/events.ts` for event type definitions.
 
 ## Logging
-- Use `logger` from `src/lib/logger.ts` (winston) — **không dùng console.log/error**
-- Dev: colored stdout. Prod: JSON stdout (parse với log aggregator)
-- Luôn pass metadata object: `logger.error('msg', { poolId, error })`
+- Use `logger` from `src/lib/logger.ts` (winston) — **never use console.log/error**
+- Dev: colored stdout. Prod: JSON stdout (structured for log aggregators)
+- Always pass a metadata object: `logger.error('msg', { poolId, error })`
 
 ## Security Patterns
-- CORS: chỉ cho phép `localhost:3000`, `localhost:5173`, và `https://${MINDPOOL_HOST}`
-- Health check `/health`: trả 503 nếu MongoDB disconnected (`readyState !== 1`)
+- CORS: only allow `localhost:3000`, `localhost:5173`, and `https://${MINDPOOL_HOST}`
+- Health check `/health`: returns 503 if MongoDB is disconnected (`readyState !== 1`)
 - Request body limit: `1mb` (express.json)
 
 ## Performance Patterns
-- **Không dùng N+1 query**: khi cần nhiều Agent docs, dùng `Agent.find({ _id: { $in: ids } })` rồi build Map
-- DB indexes: `Message(poolId+timestamp)`, `Pool(updatedAt)`, `Pool(status)` — đã có sẵn
-- `withTimeout<T>()` helper trong `mindx.service.ts` cho tất cả LLM calls (15s relevance, 120s response, 60s wrapUp)
+- **No N+1 queries**: when multiple Agent docs are needed, use `Agent.find({ _id: { $in: ids } })` and build a Map
+- DB indexes already in place: `Message(poolId+timestamp)`, `Pool(updatedAt)`, `Pool(status)`
+- `withTimeout<T>()` helper in `mindx.service.ts` wraps all LLM calls (15s relevance, 120s response, 60s wrapUp)
