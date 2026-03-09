@@ -18,8 +18,6 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - uses: pnpm/action-setup@v4
-
       - name: Auth to GCP
         uses: google-github-actions/auth@v2
         with:
@@ -30,24 +28,38 @@ jobs:
         with:
           version: '557.0.0'
 
+      # apt is faster than `gcloud components install` (~10s vs ~15s)
       - name: Install gke-gcloud-auth-plugin
-        run: gcloud components install gke-gcloud-auth-plugin --quiet
+        run: sudo apt-get install -y google-cloud-sdk-gke-gcloud-auth-plugin
 
       - name: Configure Docker for GCR
         run: gcloud auth configure-docker gcr.io --quiet
 
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
       - name: Build and push API image
         run: |
           IMAGE="gcr.io/${{ secrets.GCP_INFRA_PROJECT_ID }}/mindpool-api:${{ github.sha }}"
-          docker build -t "$IMAGE" -f apps/server/Dockerfile .
-          docker push "$IMAGE"
+          CACHE="gcr.io/${{ secrets.GCP_INFRA_PROJECT_ID }}/mindpool-api:cache"
+          docker buildx build \
+            --cache-from "type=registry,ref=$CACHE" \
+            --cache-to   "type=registry,ref=$CACHE,mode=max" \
+            --tag "$IMAGE" \
+            --push \
+            -f apps/server/Dockerfile .
           echo "API_IMAGE=$IMAGE" >> $GITHUB_ENV
 
       - name: Build and push Web image
         run: |
           IMAGE="gcr.io/${{ secrets.GCP_INFRA_PROJECT_ID }}/mindpool-web:${{ github.sha }}"
-          docker build -t "$IMAGE" -f apps/web/Dockerfile .
-          docker push "$IMAGE"
+          CACHE="gcr.io/${{ secrets.GCP_INFRA_PROJECT_ID }}/mindpool-web:cache"
+          docker buildx build \
+            --cache-from "type=registry,ref=$CACHE" \
+            --cache-to   "type=registry,ref=$CACHE,mode=max" \
+            --tag "$IMAGE" \
+            --push \
+            -f apps/web/Dockerfile .
           echo "WEB_IMAGE=$IMAGE" >> $GITHUB_ENV
 
       - name: Setup Node.js
@@ -57,6 +69,13 @@ jobs:
 
       - name: Install Pulumi CLI
         uses: pulumi/actions@v6
+
+      - name: Cache infra node_modules
+        uses: actions/cache@v4
+        with:
+          path: infra/node_modules
+          key: infra-npm-${{ hashFiles('infra/package.json') }}
+          restore-keys: infra-npm-
 
       - name: Install infra dependencies
         working-directory: infra
