@@ -2,19 +2,96 @@ name: Deploy
 
 on:
   push:
-    branches: [main, master]
+    branches: [master]
+    paths:
+      - 'apps/**'
+      - 'infra/**'
+      - '.github/workflows/deploy.yml'
+
+concurrency:
+  group: deploy
+  cancel-in-progress: false
 
 jobs:
   deploy:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+
       - uses: pnpm/action-setup@v4
-      - uses: actions/setup-node@v4
+
+      - name: Auth to GCP
+        uses: google-github-actions/auth@v2
         with:
-          node-version: 20
-          cache: 'pnpm'
-      - run: pnpm install --frozen-lockfile
-      - run: pnpm build
-      # TODO: Add Pulumi deployment step
-      # - run: pnpm -C infra pulumi up --yes
+          credentials_json: ${{ secrets.GCP_INFRA_CREDENTIALS }}
+
+      - name: Set up Cloud SDK
+        uses: google-github-actions/setup-gcloud@v2
+        with:
+          version: '557.0.0'
+
+      - name: Install gke-gcloud-auth-plugin
+        run: gcloud components install gke-gcloud-auth-plugin --quiet
+
+      - name: Configure Docker for GCR
+        run: gcloud auth configure-docker gcr.io --quiet
+
+      - name: Build and push API image
+        run: |
+          IMAGE="gcr.io/${{ secrets.GCP_INFRA_PROJECT_ID }}/mindpool-api:${{ github.sha }}"
+          docker build -t "$IMAGE" apps/server/
+          docker push "$IMAGE"
+          echo "API_IMAGE=$IMAGE" >> $GITHUB_ENV
+
+      - name: Build and push Web image
+        run: |
+          IMAGE="gcr.io/${{ secrets.GCP_INFRA_PROJECT_ID }}/mindpool-web:${{ github.sha }}"
+          docker build -t "$IMAGE" apps/web/
+          docker push "$IMAGE"
+          echo "WEB_IMAGE=$IMAGE" >> $GITHUB_ENV
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Install Pulumi CLI
+        uses: pulumi/actions@v6
+
+      - name: Install infra dependencies
+        working-directory: infra
+        run: pnpm install --no-frozen-lockfile
+
+      - name: Ensure Pulumi stack exists
+        working-directory: infra
+        env:
+          PULUMI_ACCESS_TOKEN: ${{ secrets.PULUMI_ACCESS_TOKEN }}
+        run: |
+          STACK="${{ secrets.PULUMI_STACK }}"
+          if ! pulumi stack select "$STACK" 2>/dev/null; then
+            echo "Stack '$STACK' not found, initializing..."
+            pulumi stack init "$STACK"
+          else
+            echo "Stack '$STACK' already exists."
+          fi
+
+      - name: Set Pulumi config
+        working-directory: infra
+        env:
+          PULUMI_ACCESS_TOKEN: ${{ secrets.PULUMI_ACCESS_TOKEN }}
+        run: |
+          STACK="${{ secrets.PULUMI_STACK }}"
+          pulumi config set apiImage "$API_IMAGE" --stack "$STACK"
+          pulumi config set webImage "$WEB_IMAGE" --stack "$STACK"
+          pulumi config set host "${{ secrets.MINDPOOL_HOST }}" --stack "$STACK"
+          pulumi config set infraStackRef "dongitran/gcp-infra/dev" --stack "$STACK"
+          pulumi config set --secret mongodbUrl "${{ secrets.MINDPOOL_MONGO_URI }}" --stack "$STACK"
+          pulumi config set --secret redisUrl "${{ secrets.MINDPOOL_REDIS_URL }}" --stack "$STACK"
+          pulumi config set --secret kimiApiKey "${{ secrets.MINDPOOL_KIMI_API_KEY }}" --stack "$STACK"
+          pulumi config set --secret minimaxApiKey "${{ secrets.MINDPOOL_MINIMAX_API_KEY }}" --stack "$STACK"
+
+      - name: Deploy to GKE
+        working-directory: infra
+        env:
+          PULUMI_ACCESS_TOKEN: ${{ secrets.PULUMI_ACCESS_TOKEN }}
+        run: pulumi up --yes --stack ${{ secrets.PULUMI_STACK }}
