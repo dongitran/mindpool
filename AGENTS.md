@@ -1,7 +1,7 @@
 # Mindpool — Agent Guidelines
 
 ## Project Overview
-Mindpool là nền tảng AI multi-agent discussion — users tạo "pools" (phòng họp) với các chuyên gia AI, mỗi agent một góc nhìn, cùng phân tích và tranh luận về bất kỳ chủ đề nào qua raise-hand queue system.
+Mindpool is an AI multi-agent discussion platform. Users create "pools" (meeting rooms) with AI expert agents, each with a distinct perspective, collaboratively analyzing and debating any topic via a raise-hand queue system.
 
 ## Architecture
 ```
@@ -10,10 +10,10 @@ mindpool/
 │   ├── web/          # React 19 + Vite + Zustand + TailwindCSS + Framer Motion
 │   └── server/       # Express + TypeScript + Mongoose + ioredis
 ├── packages/
-│   └── shared/       # @mindpool/shared — TypeScript types dùng chung
+│   └── shared/       # @mindpool/shared — shared TypeScript types
 ├── e2e/              # Playwright E2E tests
 ├── scripts/          # seed-db.ts, reset-dev.ts
-├── infra/            # Pulumi stubs (Phase 1)
+├── infra/            # Pulumi (GKE deployment)
 ├── docker-compose.yml
 └── .env              # API keys + port config
 ```
@@ -23,67 +23,66 @@ mindpool/
 | Layer | Technology |
 |---|---|
 | Frontend | React 19, Vite 6, Zustand 5, TailwindCSS 3, Framer Motion |
-| Backend | Express 4, TypeScript (CommonJS), Mongoose 8, ioredis 5 |
+| Backend | Express 4, TypeScript, Mongoose 8, ioredis 5 |
 | LLM | Kimi/Moonshot (primary) · MiniMax (secondary) |
 | Database | MongoDB 7 · Redis 7 |
 | Infra | Docker Compose · Turborepo · pnpm workspaces |
 | Testing | Playwright (E2E) · Vitest (unit) |
 
 ## Key Concepts
-- **Pool** — phòng thảo luận với một topic + danh sách agents
-- **MindX** — orchestrator agent: phân tích topic, chọn agent mở màn, wrap-up
-- **Raise Hand Queue** — FIFO queue (max 4), agents tự đăng ký phát biểu
-- **Visible Thinking** — collapsible thinking block (thinkSec hiển thị thời gian)
-- **SSE Streaming** — real-time events qua Server-Sent Events
+- **Pool** — discussion room with a topic + list of agents
+- **MindX** — orchestrator agent: analyzes topic, selects opening agent, generates wrap-up
+- **Raise Hand Queue** — FIFO queue (max depth 4), agents self-register to speak
+- **Visible Thinking** — collapsible thinking block (thinkSec shows elapsed time)
+- **SSE Streaming** — real-time events via Server-Sent Events
 - **LLMRouter** — provider abstraction: `agentChat(callType, messages, opts)`
-- **StopSignalDetector** — 2 signals: queue empty + user keywords
+- **StopSignalDetector** — 2 stop signals: queue empty + user keywords
 
 ## Coding Conventions
 
 ### TypeScript
-- Strict mode, CommonJS cho server (`"module": "CommonJS"`, `"moduleResolution": "Node"`)
-- Server tsconfig **không** dùng path alias `@mindpool/shared` — resolve qua `node_modules`
-- Shared types compile sang `dist/` trước khi server build
-- `noUnusedLocals: false`, `noUnusedParameters: false` (relaxed cho development)
+- Strict mode enabled
+- Server resolves `@mindpool/shared` via `node_modules` (not path alias)
+- Shared types must be compiled to `dist/` before the server builds
+- Web app uses Vite alias `@mindpool/shared → packages/shared/src` (resolves TS source directly)
 
 ### Project Patterns
-- **Routes → Services → Models** (Express)
+- **Routes → Services → Models** (Express layered architecture)
 - **Zustand stores**: `appStore` (navigation), `meetingStore` (pool state), `settingsStore`
 - **CSS custom properties**: `--bg`, `--surface-1/2/3`, `--accent`, `--purple`, `--amber`
 - **Fonts**: Sora (body) · DM Serif Display (headings) · JetBrains Mono (code/thinking)
 
 ### Shared Package
 - `packages/shared/package.json` → `"main": "./dist/index.js"`, `"files": ["dist", "src"]`
-- Phải build shared TRƯỚC server: `pnpm --filter @mindpool/shared build`
-- Web app dùng vite alias `@mindpool/shared → packages/shared/src` (resolve TS source trực tiếp)
+- Build shared **before** server: `pnpm --filter @mindpool/shared build`
 
 ## Docker & Local Dev
 
-### Chạy với Docker Compose
+### Run with Docker Compose
 ```bash
-# Copy và điền API keys
-cp .env.example .env   # hoặc chỉnh .env trực tiếp
+# Copy and fill in API keys
+cp .env.example .env
 
-# Build và start tất cả services
+# Build and start all services
 docker compose up --build -d
 
-# Seed database (sau khi server healthy)
+# Seed database (after server is healthy)
 MONGO_URI=mongodb://localhost:27017/mindpool pnpm -C scripts tsx seed-db.ts
 ```
 
 **Services:**
-| Service | URL | Mô tả |
+| Service | URL | Description |
 |---|---|---|
 | `web` | http://localhost:3000 | React app (nginx) |
 | `server` | http://localhost:3001 | Express API |
 | `mongodb` | localhost:27017 | MongoDB |
 | `redis` | localhost:6379 | Redis |
 
-**Lưu ý Dockerfile:**
-- Web Dockerfile dùng `--shamefully-hoist` + gọi vite từ `/app/node_modules/.bin/vite` (bypass pnpm stub issue)
-- Server Dockerfile dùng `pnpm deploy --filter @mindpool/server --prod /deploy` cho production node_modules
+**Dockerfile notes:**
+- Web Dockerfile uses `--shamefully-hoist` and invokes vite from `/app/node_modules/.bin/vite` (bypasses pnpm stub issue)
+- Server Dockerfile uses `pnpm deploy --filter @mindpool/server --prod /deploy` for production node_modules
 
-### Chạy Local (dev mode)
+### Run locally (dev mode)
 ```bash
 pnpm install
 pnpm dev          # turbo dev (frontend :5173 + backend :3001)
@@ -94,46 +93,47 @@ pnpm test         # turbo test (vitest)
 ## E2E Tests
 
 ```bash
-# Chạy với docker compose đang chạy
+# Run against docker compose
 BASE_URL=http://localhost:3000 pnpm --filter @mindpool/e2e exec playwright test
 
-# Chạy với dev server (tự start)
+# Run with auto-started dev server
 pnpm --filter @mindpool/e2e exec playwright test
 
-# Xem report
+# View report
 pnpm --filter @mindpool/e2e exec playwright show-report
 ```
 
-**Playwright config** tự động detect mode qua `BASE_URL` env:
-- `BASE_URL` set → dùng external server (docker compose), không start dev server
-- Không set → tự start `pnpm dev` trước khi test
+**Playwright config** auto-detects mode via `BASE_URL` env:
+- `BASE_URL` set → uses external server (docker compose), skips dev server startup
+- Not set → auto-starts `pnpm dev` before running tests
 
 ## Environment Variables
 
-| Variable | Required | Mô tả |
+| Variable | Required | Description |
 |---|---|---|
-| `KIMI_API_KEY` | Yes (production) | Moonshot AI API key |
+| `KIMI_API_KEY` | Yes | Moonshot AI API key |
 | `MINIMAX_API_KEY` | No | MiniMax API key (fallback) |
+| `MINDPOOL_HOST` | No | Production hostname (used for CORS) |
 | `MONGO_URI` | Yes | MongoDB connection string |
 | `REDIS_URL` | Yes | Redis connection string |
 | `PORT` | No (default 3001) | Server port |
 
-> **Docker Compose** tự inject `MONGO_URI` và `REDIS_URL` qua `environment` block, override `.env`
+> **Docker Compose** injects `MONGO_URI` and `REDIS_URL` via the `environment` block, overriding `.env`
 
 ## API Endpoints
 
-| Method | Path | Mô tả |
+| Method | Path | Description |
 |---|---|---|
-| `GET` | `/health` | Health check |
-| `POST` | `/api/conversations` | Tạo conversation mới |
-| `POST` | `/api/conversations/:id/message` | Gửi tin nhắn, nhận MindX reply |
-| `POST` | `/api/pool/create` | Tạo pool từ topic + agentIds |
-| `GET` | `/api/pool/:id` | Lấy pool details |
-| `GET` | `/api/pools` | Danh sách tất cả pools |
-| `POST` | `/api/pool/:id/message` | User gửi tin trong meeting |
-| `GET` | `/api/stream/:poolId` | SSE stream (real-time events) |
-| `GET` | `/api/settings` | Lấy settings |
-| `PUT` | `/api/settings` | Cập nhật settings |
+| `GET` | `/health` | Health check (returns 503 if DB disconnected) |
+| `POST` | `/api/conversations` | Create a new conversation |
+| `POST` | `/api/conversations/:id/message` | Send message, receive MindX reply |
+| `POST` | `/api/pool/create` | Create pool from topic + agentIds |
+| `GET` | `/api/pool/:id` | Get pool details |
+| `GET` | `/api/pools` | List all pools |
+| `POST` | `/api/pool/:id/message` | User sends message in meeting |
+| `GET` | `/api/stream/:poolId` | SSE stream (real-time events) — supports `?after=<ISO>` |
+| `GET` | `/api/settings` | Get settings |
+| `PUT` | `/api/settings` | Update settings |
 
 ## SSE Event Types
 ```typescript

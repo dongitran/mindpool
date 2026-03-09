@@ -3,8 +3,20 @@ name: CI
 on:
   push:
     branches: [master]
+    paths:
+      - 'apps/**'
+      - 'packages/**'
+      - 'e2e/**'
+      - 'pnpm-lock.yaml'
+      - '.github/workflows/ci.yml'
   pull_request:
     branches: [main, master]
+    paths:
+      - 'apps/**'
+      - 'packages/**'
+      - 'e2e/**'
+      - 'pnpm-lock.yaml'
+      - '.github/workflows/ci.yml'
 
 jobs:
   ci:
