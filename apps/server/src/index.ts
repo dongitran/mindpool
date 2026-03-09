@@ -46,12 +46,14 @@ app.get('/health', async (_req, res) => {
     res.status(503).json({ status: 'unhealthy', db: 'disconnected', timestamp: new Date().toISOString() });
     return;
   }
+  let redisStatus = 'connected';
   try {
     await redis.ping();
-    res.json({ status: 'ok', db: 'connected', redis: 'connected', timestamp: new Date().toISOString() });
   } catch {
-    res.status(503).json({ status: 'unhealthy', db: 'connected', redis: 'disconnected', timestamp: new Date().toISOString() });
+    // Redis down → degraded, not fatal — pod stays alive, DB still serves reads
+    redisStatus = 'disconnected';
   }
+  res.json({ status: 'ok', db: 'connected', redis: redisStatus, timestamp: new Date().toISOString() });
 });
 
 async function start() {
