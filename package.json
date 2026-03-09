@@ -1,7 +1,10 @@
 {
   "name": "mindpool",
   "private": true,
-  "workspaces": ["apps/*", "packages/*"],
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
   "scripts": {
     "dev": "turbo dev",
     "build": "turbo build",
@@ -11,6 +14,7 @@
     "clean": "turbo clean"
   },
   "devDependencies": {
+    "@cspell/dict-vi-vn": "^3.0.6",
     "turbo": "^2.4.0",
     "typescript": "^5.7.0",
     "vite": "^6.0.0"

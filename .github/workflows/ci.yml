@@ -18,3 +18,5 @@ jobs:
       - run: pnpm typecheck
       - run: pnpm lint
       - run: pnpm test
+      - name: Spell check
+        run: npx cspell "**/*.{ts,tsx,js,json,yml,yaml}" --no-progress
