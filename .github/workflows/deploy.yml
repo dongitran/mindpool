@@ -39,14 +39,14 @@ jobs:
       - name: Build and push API image
         run: |
           IMAGE="gcr.io/${{ secrets.GCP_INFRA_PROJECT_ID }}/mindpool-api:${{ github.sha }}"
-          docker build -t "$IMAGE" apps/server/
+          docker build -t "$IMAGE" -f apps/server/Dockerfile .
           docker push "$IMAGE"
           echo "API_IMAGE=$IMAGE" >> $GITHUB_ENV
 
       - name: Build and push Web image
         run: |
           IMAGE="gcr.io/${{ secrets.GCP_INFRA_PROJECT_ID }}/mindpool-web:${{ github.sha }}"
-          docker build -t "$IMAGE" apps/web/
+          docker build -t "$IMAGE" -f apps/web/Dockerfile .
           docker push "$IMAGE"
           echo "WEB_IMAGE=$IMAGE" >> $GITHUB_ENV
 
