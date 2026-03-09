@@ -28,9 +28,8 @@ jobs:
         with:
           version: '557.0.0'
 
-      # apt is faster than `gcloud components install` (~10s vs ~15s)
       - name: Install gke-gcloud-auth-plugin
-        run: sudo apt-get install -y google-cloud-sdk-gke-gcloud-auth-plugin
+        run: gcloud components install gke-gcloud-auth-plugin --quiet
 
       - name: Configure Docker for GCR
         run: gcloud auth configure-docker gcr.io --quiet
