@@ -114,3 +114,53 @@ jobs:
         env:
           PULUMI_ACCESS_TOKEN: ${{ secrets.PULUMI_ACCESS_TOKEN }}
         run: pulumi up --yes --stack ${{ secrets.PULUMI_STACK }}
+
+  e2e:
+    needs: deploy
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'pnpm'
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Install Playwright browsers
+        working-directory: e2e
+        run: npx playwright install --with-deps chromium
+
+      - name: Wait for deployment to be ready
+        run: |
+          URL="https://${{ secrets.MINDPOOL_HOST }}"
+          echo "Waiting for $URL to be ready..."
+          for i in $(seq 1 12); do
+            if curl -sf --max-time 10 "$URL" > /dev/null; then
+              echo "Service is ready!"
+              exit 0
+            fi
+            echo "Attempt $i/12 — not ready yet, retrying in 15s..."
+            sleep 15
+          done
+          echo "Service did not become ready within 3 minutes"
+          exit 1
+
+      - name: Run E2E tests
+        working-directory: e2e
+        env:
+          BASE_URL: https://${{ secrets.MINDPOOL_HOST }}
+          CI: 'true'
+        run: npx playwright test
+
+      - name: Upload Playwright report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report
+          path: e2e/playwright-report/
+          retention-days: 7
