@@ -30,6 +30,7 @@ jobs:
 
       - name: Install gke-gcloud-auth-plugin
         run: gcloud components install gke-gcloud-auth-plugin --quiet
+        # Installed via gcloud components (apt repo not available on runner)
 
       - name: Configure Docker for GCR
         run: gcloud auth configure-docker gcr.io --quiet
