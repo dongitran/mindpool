@@ -60,9 +60,7 @@ jobs:
 
       - name: Install infra dependencies
         working-directory: infra
-        env:
-          PULUMI_ACCESS_TOKEN: ${{ secrets.PULUMI_ACCESS_TOKEN }}
-        run: pulumi install
+        run: npm install
 
       - name: Ensure Pulumi stack exists
         working-directory: infra

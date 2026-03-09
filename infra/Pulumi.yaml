@@ -3,4 +3,4 @@ description: Web + API deployment on GKE for Mindpool
 runtime:
   name: nodejs
   options:
-    packagemanager: pnpm
+    packagemanager: npm
