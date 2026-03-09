@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import * as poolService from '../services/pool.service';
 import * as mindxService from '../services/mindx.service';
+import { redis, MEETING_QUEUE_KEY } from '../lib/redis';
 import { logger } from '../lib/logger';
 
 const router = Router();
@@ -16,27 +17,23 @@ router.post('/pool/create', async (req, res, next) => {
     }
 
     const pool = await poolService.createPool(topic, agentIds, conversationId || '');
+    const poolId = pool._id.toString();
 
-    // Generate opening announcement
-    await mindxService.generateAnnouncement(pool._id.toString());
+    // Generate opening announcement (sync — needed before loop starts)
+    await mindxService.generateAnnouncement(poolId);
 
-    // Select opening agent and start the meeting loop
+    // Select opening agent and seed the in-memory queue
     const agents = pool.agents.map((a) => ({
       agentId: a.agentId,
       name: a.name,
       specialty: a.role,
     }));
-
     const openingAgent = await mindxService.selectOpeningAgent(topic, agents);
+    mindxService.getQueueManager(poolId).addToQueue(openingAgent.agentId);
 
-    // Add opening agent to queue
-    const queueManager = mindxService.getQueueManager(pool._id.toString());
-    queueManager.addToQueue(openingAgent.agentId);
-
-    // Kick off the first turn
-    mindxService.handleMeetingLoop(pool._id.toString()).catch((err) => {
-      logger.error('Meeting loop error', { error: err });
-    });
+    // Enqueue meeting loop job — worker picks it up via BLPOP
+    await redis.rpush(MEETING_QUEUE_KEY, JSON.stringify({ poolId }));
+    logger.info('Meeting loop enqueued', { poolId });
 
     res.status(201).json(pool);
   } catch (error) {
@@ -68,7 +65,7 @@ router.get('/pools', async (_req, res, next) => {
   }
 });
 
-// POST /pool/:id/message — user sends message in meeting
+// POST /pool/:id/message — user sends a message in an active meeting
 router.post('/pool/:id/message', async (req, res, next) => {
   try {
     const { content } = req.body;
@@ -84,20 +81,15 @@ router.post('/pool/:id/message', async (req, res, next) => {
       return;
     }
 
-    // Add user message
-    const message = await poolService.addMessage(poolId, {
-      agentId: 'user',
-      content,
-    });
+    // Persist user message
+    const message = await poolService.addMessage(poolId, { agentId: 'user', content });
 
-    // Check stop signals
-    const stopDetector = mindxService.getStopDetector(poolId);
-    stopDetector.checkUserTrigger(content);
+    // Update stop detector with user message (same process — in-memory is fine)
+    mindxService.getStopDetector(poolId).checkUserTrigger(content);
 
-    // Trigger next round of the meeting loop
-    mindxService.handleMeetingLoop(poolId).catch((err) => {
-      logger.error('Meeting loop error', { error: err });
-    });
+    // Enqueue next meeting loop round
+    await redis.rpush(MEETING_QUEUE_KEY, JSON.stringify({ poolId }));
+    logger.info('Meeting loop enqueued (user message)', { poolId });
 
     res.json(message);
   } catch (error) {

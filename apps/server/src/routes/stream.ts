@@ -2,33 +2,56 @@ import { Router } from 'express';
 import type { Request, Response } from 'express';
 import { Message } from '../models';
 import { logger } from '../lib/logger';
+import { redisSub } from '../lib/redis';
 
 const router = Router();
 
-// Active SSE connections per pool
+// poolId → Set of active SSE response objects
 const poolConnections = new Map<string, Set<Response>>();
 
-export function sendSSEToPool(poolId: string, event: object): void {
-  const connections = poolConnections.get(poolId);
-  if (!connections) return;
+// Pool IDs we are currently subscribed to in Redis
+const subscribedPools = new Set<string>();
 
-  const data = `data: ${JSON.stringify(event)}\n\n`;
+// Forward Redis Pub/Sub messages to all SSE clients for that pool
+redisSub.on('message', (channel: string, data: string) => {
+  const poolId = channel.slice('sse:pool:'.length);
+  const connections = poolConnections.get(poolId);
+  if (!connections?.size) return;
+
+  const payload = `data: ${data}\n\n`;
   for (const res of connections) {
-    res.write(data);
+    try {
+      res.write(payload);
+    } catch {
+      // Client already disconnected — will be cleaned up on 'close' event
+    }
+  }
+});
+
+async function subscribePoolChannel(poolId: string): Promise<void> {
+  if (!subscribedPools.has(poolId)) {
+    await redisSub.subscribe(`sse:pool:${poolId}`);
+    subscribedPools.add(poolId);
+  }
+}
+
+async function maybeUnsubscribePoolChannel(poolId: string): Promise<void> {
+  const connections = poolConnections.get(poolId);
+  if (!connections || connections.size === 0) {
+    subscribedPools.delete(poolId);
+    await redisSub.unsubscribe(`sse:pool:${poolId}`);
   }
 }
 
 // GET /stream/:poolId — SSE connection
-router.get('/:poolId', (req: Request<{ poolId: string }>, res: Response) => {
-  const poolId = req.params.poolId;
+router.get('/:poolId', async (req: Request<{ poolId: string }>, res: Response) => {
+  const { poolId } = req.params;
 
-  // Set SSE headers
   res.setHeader('Content-Type', 'text/event-stream');
   res.setHeader('Cache-Control', 'no-cache');
   res.setHeader('Connection', 'keep-alive');
   res.setHeader('X-Accel-Buffering', 'no');
 
-  // Send initial connection event
   res.write(`data: ${JSON.stringify({ type: 'connected', poolId })}\n\n`);
 
   // Register connection
@@ -37,34 +60,32 @@ router.get('/:poolId', (req: Request<{ poolId: string }>, res: Response) => {
   }
   poolConnections.get(poolId)!.add(res);
 
-  // Send existing messages — support ?after=<ISO timestamp> to avoid replaying
-  // messages the client has already seen (prevents duplicates on reconnect)
+  // Subscribe to Redis channel for this pool (no-op if already subscribed)
+  await subscribePoolChannel(poolId);
+
+  // Send existing messages — support ?after=<ISO> to avoid replaying on reconnect
   const afterRaw = req.query.after as string | undefined;
   const afterDate = afterRaw ? new Date(afterRaw) : null;
-  const msgQuery = afterDate && !isNaN(afterDate.getTime())
-    ? Message.find({ poolId, timestamp: { $gt: afterDate } })
-    : Message.find({ poolId });
+  const query =
+    afterDate && !isNaN(afterDate.getTime())
+      ? Message.find({ poolId, timestamp: { $gt: afterDate } })
+      : Message.find({ poolId });
 
-  msgQuery
-    .sort({ timestamp: 1 })
-    .then((messages) => {
-      for (const msg of messages) {
-        res.write(
-          `data: ${JSON.stringify({ type: 'message', message: msg })}\n\n`
-        );
-      }
-    })
-    .catch((err) => {
-      logger.error('SSE error fetching messages', { error: err });
-    });
+  try {
+    const messages = await query.sort({ timestamp: 1 });
+    for (const msg of messages) {
+      res.write(`data: ${JSON.stringify({ type: 'message', message: msg })}\n\n`);
+    }
+  } catch (err) {
+    logger.error('SSE error fetching messages', { error: err });
+  }
 
-  // Heartbeat to keep connection alive
+  // Heartbeat to keep connection alive through proxies/load balancers
   const heartbeat = setInterval(() => {
-    res.write(`: heartbeat\n\n`);
+    res.write(': heartbeat\n\n');
   }, 30_000);
 
-  // Clean up on close
-  req.on('close', () => {
+  req.on('close', async () => {
     clearInterval(heartbeat);
     const connections = poolConnections.get(poolId);
     if (connections) {
@@ -73,6 +94,7 @@ router.get('/:poolId', (req: Request<{ poolId: string }>, res: Response) => {
         poolConnections.delete(poolId);
       }
     }
+    await maybeUnsubscribePoolChannel(poolId);
   });
 });
 

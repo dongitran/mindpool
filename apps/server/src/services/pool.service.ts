@@ -1,3 +1,4 @@
+import type { AgentState } from '@mindpool/shared';
 import { Pool, Agent, Message } from '../models';
 
 export async function createPool(
@@ -52,6 +53,18 @@ export async function updatePoolStatus(
   status: 'setup' | 'active' | 'completed'
 ) {
   return Pool.findByIdAndUpdate(id, { status }, { new: true });
+}
+
+export async function updateAgentState(
+  poolId: string,
+  agentId: string,
+  state: AgentState
+) {
+  return Pool.findByIdAndUpdate(
+    poolId,
+    { $set: { 'agents.$[elem].state': state } },
+    { arrayFilters: [{ 'elem.agentId': agentId }], new: true }
+  );
 }
 
 export async function addMessage(
