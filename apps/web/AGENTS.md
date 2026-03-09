@@ -19,5 +19,16 @@ React 19 + Vite + TypeScript + Zustand + TailwindCSS + Framer Motion
 
 ## Key Patterns
 - SSE via EventSource for real-time meeting updates
+- `useSSE` tracks `lastTimestampRef` → reconnect với `?after=<ISO>` để tránh duplicate messages
 - Zustand stores as single source of truth
 - CSS custom properties for dynamic theming (accent color)
+
+## Type Safety
+- API return types được define tại `src/lib/api.ts` — dùng generic `request<Pool>()`, `request<Conversation[]>()`
+- `appStore`: `pools: Pool[]`, `conversations: Conversation[]` từ `@mindpool/shared`
+- `meetingStore`: `pool: Pool | null` — **không dùng any**
+- `meetingStore.messages` là `MeetingMessage[]` (display objects, đến từ SSE) — **không phải** `Pool.messages` (string IDs)
+
+## Security
+- Tất cả `dangerouslySetInnerHTML` **phải** wrap qua `DOMPurify.sanitize()` trước khi render
+- Import: `import DOMPurify from 'dompurify'`
