@@ -4,8 +4,15 @@ on:
   push:
     branches: [master]
     paths:
-      - 'apps/**'
+      - 'apps/**/*.ts'
+      - 'apps/**/*.tsx'
+      - 'apps/**/*.js'
+      - 'apps/**/*.json'
+      - 'apps/**/*.css'
+      - 'apps/**/Dockerfile'
+      - 'apps/**/nginx*.conf'
       - 'infra/**'
+      - 'pnpm-lock.yaml'
       - '.github/workflows/deploy.yml'
 
 concurrency:

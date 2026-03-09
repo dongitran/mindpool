@@ -3,20 +3,16 @@ name: CI
 on:
   push:
     branches: [master]
-    paths:
-      - 'apps/**'
-      - 'packages/**'
-      - 'e2e/**'
-      - 'pnpm-lock.yaml'
-      - '.github/workflows/ci.yml'
+    paths-ignore:
+      - '**/*.md'
+      - 'plans/**'
+      - 'docs/**'
   pull_request:
     branches: [main, master]
-    paths:
-      - 'apps/**'
-      - 'packages/**'
-      - 'e2e/**'
-      - 'pnpm-lock.yaml'
-      - '.github/workflows/ci.yml'
+    paths-ignore:
+      - '**/*.md'
+      - 'plans/**'
+      - 'docs/**'
 
 jobs:
   ci:
