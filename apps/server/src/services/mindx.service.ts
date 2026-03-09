@@ -192,7 +192,7 @@ export async function generateWrapUp(poolId: string): Promise<string> {
 export async function handleMeetingLoop(poolId: string): Promise<void> {
   // Distributed lock — prevents concurrent loops for the same pool
   const lockKey = `lock:pool:${poolId}`;
-  const acquired = await redis.set(lockKey, '1', 'NX', 'EX', POOL_LOCK_TTL_SEC);
+  const acquired = await redis.set(lockKey, '1', 'EX', POOL_LOCK_TTL_SEC, 'NX');
   if (!acquired) {
     logger.info('[MindX] Loop already running, skipping', { poolId });
     return;

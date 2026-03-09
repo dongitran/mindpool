@@ -70,6 +70,11 @@
     "suspensey",
     "serviceworker",
     "beforeblur",
-    "afterblur"
+    "afterblur",
+    "rpush",
+    "blpop",
+    "RPUSH",
+    "BLPOP",
+    "pubsub"
   ]
 }
