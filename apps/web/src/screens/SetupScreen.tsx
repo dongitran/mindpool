@@ -72,7 +72,7 @@ export function SetupScreen() {
   // Skip fetching conversation when we've just locally created it in handleSend
   const skipNextFetch = useRef(false);
 
-  // Load existing conversation on mount (if navigated back to an existing convo)
+  // Load existing conversation on mount (if navigated back to an existing conversation)
   useEffect(() => {
     if (!currentConversationId) {
       setMessages([GREETING]);
