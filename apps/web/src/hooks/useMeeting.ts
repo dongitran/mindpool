@@ -5,7 +5,17 @@ import { useSSE } from './useSSE';
 import { api } from '../lib/api';
 
 export function useMeeting(poolId: string | null) {
-  const store = useMeetingStore();
+  // Select stable method references (don't change on state updates)
+  const setCurrentPool = useMeetingStore((s) => s.setCurrentPool);
+  const addMessage = useMeetingStore((s) => s.addMessage);
+  const setLoading = useMeetingStore((s) => s.setLoading);
+  // Select reactive state values
+  const pool = useMeetingStore((s) => s.pool);
+  const messages = useMeetingStore((s) => s.messages);
+  const agentStates = useMeetingStore((s) => s.agentStates);
+  const queue = useMeetingStore((s) => s.queue);
+  const isLoading = useMeetingStore((s) => s.isLoading);
+
   const setError = useAppStore((s) => s.setError);
 
   // Connect SSE
@@ -14,24 +24,24 @@ export function useMeeting(poolId: string | null) {
   // Load pool data
   useEffect(() => {
     if (!poolId) return;
-    store.setLoading(true);
+    setLoading(true);
     api
       .getPool(poolId)
-      .then((pool) => {
-        store.setCurrentPool(poolId, pool);
+      .then((p) => {
+        setCurrentPool(poolId, p);
       })
       .catch(() => {
         setError('Không thể tải thông tin meeting');
       })
       .finally(() => {
-        store.setLoading(false);
+        setLoading(false);
       });
-  }, [poolId, store, setError]);
+  }, [poolId, setCurrentPool, setLoading, setError]);
 
   const sendMessage = useCallback(
     async (content: string) => {
       if (!poolId) return;
-      store.addMessage({
+      addMessage({
         type: 'user',
         content,
         timestamp: new Date().toISOString(),
@@ -42,15 +52,15 @@ export function useMeeting(poolId: string | null) {
         setError('Không thể gửi tin nhắn. Vui lòng thử lại.');
       }
     },
-    [poolId, store, setError],
+    [poolId, addMessage, setError],
   );
 
   return {
-    pool: store.pool,
-    messages: store.messages,
-    agentStates: store.agentStates,
-    queue: store.queue,
-    isLoading: store.isLoading,
+    pool,
+    messages,
+    agentStates,
+    queue,
+    isLoading,
     sendMessage,
   };
 }

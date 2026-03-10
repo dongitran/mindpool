@@ -200,7 +200,12 @@ export async function handleMeetingLoop(poolId: string): Promise<void> {
 
   try {
     const pool = await Pool.findById(poolId);
-    if (!pool || pool.status !== 'active') return;
+    if (!pool || pool.status !== 'active') {
+      // Cleanup in-memory state for pools that are gone or no longer active
+      poolQueues.delete(poolId);
+      poolStopDetectors.delete(poolId);
+      return;
+    }
 
     const queueManager = getQueueManager(poolId);
     const stopDetector = getStopDetector(poolId);

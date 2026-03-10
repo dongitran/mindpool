@@ -62,6 +62,11 @@ function decrypt(text: string): string {
   }
 }
 
+export function encryptApiKey(key: string): string {
+  if (!key || key.startsWith('enc:')) return key;
+  return encrypt(key);
+}
+
 export function maskApiKey(key: string): string {
   if (!key) return '';
   const decrypted = decrypt(key);

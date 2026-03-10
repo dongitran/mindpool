@@ -13,21 +13,32 @@ export async function startWorker(): Promise<void> {
   running = true;
   logger.info('[Worker] Meeting loop worker started');
 
+  let consecutiveErrors = 0;
+
   while (running) {
     try {
       // BLPOP with 5s timeout so we can check the `running` flag on each iteration
       const result = await redisWorker.blpop(MEETING_QUEUE_KEY, 5);
       if (!result) continue; // timeout — loop and check `running`
 
+      consecutiveErrors = 0; // reset on successful BLPOP
+
       const [, payload] = result;
-      const { poolId } = JSON.parse(payload) as { poolId: string };
+      let poolId: string;
+      try {
+        ({ poolId } = JSON.parse(payload) as { poolId: string });
+      } catch {
+        logger.error('[Worker] Invalid job payload, skipping', { payload });
+        continue;
+      }
 
       logger.info('[Worker] Processing job', { poolId });
       await handleMeetingLoop(poolId);
     } catch (error) {
-      logger.error('[Worker] Job error', { error });
-      // Small back-off to avoid tight crash loops
-      await new Promise((resolve) => setTimeout(resolve, 1_000));
+      consecutiveErrors++;
+      const delay = Math.min(1_000 * Math.pow(2, consecutiveErrors - 1), 30_000);
+      logger.error('[Worker] Job error, retrying in %dms', delay, { error, consecutiveErrors });
+      await new Promise((resolve) => setTimeout(resolve, delay));
     }
   }
 

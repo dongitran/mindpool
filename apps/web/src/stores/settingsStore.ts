@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 
-interface SettingsState {
+interface SettingsData {
   defaultModel: string;
   thinkingBudget: number;
   autoStartDiscussion: boolean;
@@ -11,9 +11,11 @@ interface SettingsState {
   compactSidebar: boolean;
   accentColor: string;
   apiKeys: { kimi?: string; minimax?: string };
+}
 
-  updateSetting: <K extends keyof SettingsState>(key: K, value: SettingsState[K]) => void;
-  setAll: (settings: Partial<SettingsState>) => void;
+interface SettingsState extends SettingsData {
+  updateSetting: <K extends keyof SettingsData>(key: K, value: SettingsData[K]) => void;
+  setAll: (settings: Partial<SettingsData>) => void;
 }
 
 export const useSettingsStore = create<SettingsState>((set) => ({

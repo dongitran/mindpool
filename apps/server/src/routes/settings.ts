@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { Settings, maskApiKey } from '../models';
+import { Settings, maskApiKey, encryptApiKey } from '../models';
 import { validate } from '../middleware/validate';
 import { updateSettingsSchema } from '../schemas/settings.schema';
 
@@ -28,13 +28,31 @@ router.get('/', async (_req, res, next) => {
 // PUT /settings — update settings (validated, whitelisted fields only)
 router.put('/', validate(updateSettingsSchema), async (req, res, next) => {
   try {
+    const update = { ...req.body };
+
+    // Encrypt API keys before storing (findOneAndUpdate bypasses pre-save hooks)
+    if (update.apiKeys) {
+      if (update.apiKeys.kimi) {
+        update.apiKeys.kimi = encryptApiKey(update.apiKeys.kimi);
+      }
+      if (update.apiKeys.minimax) {
+        update.apiKeys.minimax = encryptApiKey(update.apiKeys.minimax);
+      }
+    }
+
     const settings = await Settings.findOneAndUpdate(
       { userId: 'default' },
-      { $set: req.body },
+      { $set: update },
       { new: true, upsert: true }
     );
 
-    res.json(settings);
+    // Mask API keys in response (same as GET)
+    const obj = settings.toObject();
+    obj.apiKeys = {
+      kimi: maskApiKey(obj.apiKeys?.kimi ?? ''),
+      minimax: maskApiKey(obj.apiKeys?.minimax ?? ''),
+    };
+    res.json(obj);
   } catch (error) {
     next(error);
   }
