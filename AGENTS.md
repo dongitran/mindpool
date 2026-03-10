@@ -11,6 +11,7 @@ mindpool/
 │   └── server/       # Express + TypeScript + Mongoose + ioredis
 ├── packages/
 │   └── shared/       # @mindpool/shared — shared TypeScript types
+├── .agents/          # Agent configs & rules (Antigravity standard)
 ├── e2e/              # Playwright E2E tests
 ├── scripts/          # seed-db.ts, reset-dev.ts
 ├── infra/            # Pulumi (GKE deployment)
