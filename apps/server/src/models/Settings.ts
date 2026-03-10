@@ -21,7 +21,6 @@ export interface SettingsDocument extends Document {
 
 const ALGORITHM = 'aes-256-gcm';
 const IV_LENGTH = 16;
-const AUTH_TAG_LENGTH = 16;
 
 function getEncryptionKey(): Buffer | null {
   if (!config.encryptionKey) return null;

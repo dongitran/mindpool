@@ -11,7 +11,7 @@ import { logger } from './lib/logger';
 import { redis, redisSub, redisWorker } from './lib/redis';
 import { startWorker, stopWorker } from './queue/worker';
 import rateLimit from 'express-rate-limit';
-import { RedisStore } from 'rate-limit-redis';
+import { RedisStore, type RedisReply } from 'rate-limit-redis';
 
 const app = express();
 
@@ -41,7 +41,7 @@ const globalLimiter = rateLimit({
   max: 100,
   standardHeaders: true,
   legacyHeaders: false,
-  store: new RedisStore({ sendCommand: (...args: string[]) => redis.call(args[0], ...args.slice(1)) as Promise<any> }),
+  store: new RedisStore({ sendCommand: (...args: string[]) => redis.call(args[0], ...args.slice(1)) as Promise<RedisReply> }),
   message: { error: { message: 'Too many requests, please try again later' } },
 });
 
@@ -50,7 +50,7 @@ const poolCreateLimiter = rateLimit({
   max: 5,
   standardHeaders: true,
   legacyHeaders: false,
-  store: new RedisStore({ sendCommand: (...args: string[]) => redis.call(args[0], ...args.slice(1)) as Promise<any> }),
+  store: new RedisStore({ sendCommand: (...args: string[]) => redis.call(args[0], ...args.slice(1)) as Promise<RedisReply> }),
   message: { error: { message: 'Too many pool creation requests' } },
 });
 
@@ -59,7 +59,7 @@ const messageLimiter = rateLimit({
   max: 20,
   standardHeaders: true,
   legacyHeaders: false,
-  store: new RedisStore({ sendCommand: (...args: string[]) => redis.call(args[0], ...args.slice(1)) as Promise<any> }),
+  store: new RedisStore({ sendCommand: (...args: string[]) => redis.call(args[0], ...args.slice(1)) as Promise<RedisReply> }),
   message: { error: { message: 'Too many messages, please slow down' } },
 });
 
