@@ -2,7 +2,7 @@ import type { ChatMessage, ChatOptions } from '@mindpool/shared';
 import type { LLMProvider } from '../types';
 import { withRetry } from '../retry';
 
-const KIMI_API_URL = 'https://api.moonshot.cn/v1/chat/completions';
+const KIMI_API_URL = 'https://api.kimi.com/coding/v1/chat/completions';
 
 export class KimiProvider implements LLMProvider {
   readonly id = 'kimi';
@@ -30,7 +30,8 @@ export class KimiProvider implements LLMProvider {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          Authorization: `Bearer ${this.apiKey}`,
+          'Authorization': `Bearer ${this.apiKey}`,
+          'User-Agent': 'claude-code/1.0.0',
         },
         body: JSON.stringify(body),
       });

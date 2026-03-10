@@ -17,69 +17,131 @@ interface ConvMessage {
   agentBadges?: string[];
 }
 
-export function SetupScreen() {
-  const { currentConversationId, navigateToMeeting } = useAppStore();
-  const [messages, setMessages] = useState<ConvMessage[]>([]);
-  const [title, setTitle] = useState('MindX');
-  const [sub, setSub] = useState('Mô tả chủ đề — AI sẽ gợi ý agents phù hợp');
-  const [createdMeetings, setCreatedMeetings] = useState<Set<string>>(new Set());
-  const msgsRef = useRef<HTMLDivElement>(null);
+/** Animated "MindX is typing..." indicator */
+function TypingIndicator() {
+  return (
+    <div className="px-[22px] py-2 flex items-center gap-2.5">
+      <div
+        className="w-7 h-7 rounded-full flex-shrink-0 flex items-center justify-center text-sm"
+        style={{ background: 'var(--surface-2)', border: '1px solid var(--border)' }}
+      >
+        🤖
+      </div>
+      <div
+        className="px-3.5 py-2.5 rounded-[var(--radius)] flex items-center gap-1"
+        style={{ background: 'var(--surface-2)', border: '1px solid var(--border)' }}
+      >
+        <span
+          className="w-1.5 h-1.5 rounded-full"
+          style={{ background: 'var(--text-muted)', animation: 'typingDot 1.2s ease-in-out infinite', animationDelay: '0s' }}
+        />
+        <span
+          className="w-1.5 h-1.5 rounded-full"
+          style={{ background: 'var(--text-muted)', animation: 'typingDot 1.2s ease-in-out infinite', animationDelay: '0.2s' }}
+        />
+        <span
+          className="w-1.5 h-1.5 rounded-full"
+          style={{ background: 'var(--text-muted)', animation: 'typingDot 1.2s ease-in-out infinite', animationDelay: '0.4s' }}
+        />
+        <span className="text-[11px] ml-1.5" style={{ color: 'var(--text-muted)' }}>
+          MindX đang suy nghĩ...
+        </span>
+      </div>
+    </div>
+  );
+}
 
+const makeTime = () =>
+  new Date().toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true });
+
+const GREETING: ConvMessage = {
+  type: 'bot',
+  time: makeTime(),
+  content:
+    'Xin chào! Tôi là <strong>MindX</strong> — trợ lý điều phối của Mindpool.<br><br>Hãy mô tả chủ đề bạn muốn thảo luận — tôi sẽ gợi ý những expert agent phù hợp nhất và tạo <strong>Mindpool</strong> cho bạn. 🎯',
+};
+
+export function SetupScreen() {
+  const { currentConversationId, setCurrentConversation, navigateToMeeting } = useAppStore();
+  const [messages, setMessages] = useState<ConvMessage[]>([GREETING]);
+  const [title] = useState('MindX');
+  const [sub] = useState('Mô tả chủ đề — AI sẽ gợi ý agents phù hợp');
+  const [createdMeetings, setCreatedMeetings] = useState<Set<string>>(new Set());
+  const [isTyping, setIsTyping] = useState(false);
+  const msgsRef = useRef<HTMLDivElement>(null);
+  // Skip fetching conversation when we've just locally created it in handleSend
+  const skipNextFetch = useRef(false);
+
+  // Load existing conversation on mount (if navigated back to an existing convo)
   useEffect(() => {
-    if (currentConversationId) {
-      api.getConversation(currentConversationId).then((conv) => {
-        setTitle(conv.title || 'MindX');
-        setSub(conv.sub || '');
-        setMessages((conv.messages as ConvMessage[]) || []);
-      }).catch(() => {
-        // New conversation — show greeting
-        setMessages([{
-          type: 'bot',
-          time: new Date().toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true }),
-          content: 'Xin chào! Tôi là <strong>MindX</strong> — trợ lý điều phối của Mindpool.<br><br>Hãy mô tả chủ đề bạn muốn thảo luận — tôi sẽ gợi ý những expert agent phù hợp nhất và tạo <strong>Mindpool</strong> cho bạn. 🎯',
-        }]);
-      });
-    } else {
-      setMessages([{
-        type: 'bot',
-        time: new Date().toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true }),
-        content: 'Xin chào! Tôi là <strong>MindX</strong> — trợ lý điều phối của Mindpool.<br><br>Hãy mô tả chủ đề bạn muốn thảo luận — tôi sẽ gợi ý những expert agent phù hợp nhất và tạo <strong>Mindpool</strong> cho bạn. 🎯',
-      }]);
+    if (!currentConversationId) {
+      setMessages([GREETING]);
+      return;
     }
+    if (skipNextFetch.current) {
+      skipNextFetch.current = false;
+      return;
+    }
+    api
+      .getConversation(currentConversationId)
+      .then((conv) => {
+        if (conv.messages?.length) {
+          setMessages(conv.messages as ConvMessage[]);
+        }
+      })
+      .catch(() => {
+        // Keep local messages if fetch fails
+      });
   }, [currentConversationId]);
 
+  // Auto-scroll to bottom when messages change
   useEffect(() => {
     if (msgsRef.current) {
       msgsRef.current.scrollTop = msgsRef.current.scrollHeight;
     }
-  }, [messages]);
+  }, [messages, isTyping]);
 
   const handleSend = async (content: string) => {
-    const now = new Date().toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true });
-    setMessages((prev) => [...prev, { type: 'user', time: now, content }]);
+    const userMsg: ConvMessage = { type: 'user', time: makeTime(), content };
+    setMessages((prev) => [...prev, userMsg]);
+    setIsTyping(true);
 
     try {
-      if (currentConversationId) {
-        const reply = await api.sendConversationMessage(currentConversationId, content) as { message?: ConvMessage };
-        if (reply?.message) {
-          setMessages((prev) => [...prev, reply.message!]);
-        }
+      // ── Step 1: ensure a conversation exists ──────────────────────────
+      let convId = currentConversationId;
+      if (!convId) {
+        const newConv = await api.createConversation();
+        convId = newConv._id as string;
+        // Skip the useEffect fetch triggered by setCurrentConversation — we
+        // are managing messages locally to avoid overwriting the user's message.
+        skipNextFetch.current = true;
+        setCurrentConversation(convId);
+      }
+
+      // ── Step 2: send message — backend returns { message: botMessage } ────
+      const result = await api.sendConversationMessage(convId, content) as {
+        message?: ConvMessage;
+      };
+
+      if (result.message) {
+        setMessages((prev) => [...prev, result.message as ConvMessage]);
       }
     } catch {
       setMessages((prev) => [
         ...prev,
         {
           type: 'bot',
-          time: now,
-          content: 'Tôi hiểu rồi! Bạn muốn điều chỉnh agent lineup hoặc sẵn sàng bắt đầu meeting?',
+          time: makeTime(),
+          content: '⚠️ Xin lỗi, tôi gặp lỗi khi xử lý. Bạn thử lại nhé!',
         },
       ]);
+    } finally {
+      setIsTyping(false);
     }
   };
 
   const handleStartMeeting = async (meetingId: string) => {
     setCreatedMeetings((prev) => new Set(prev).add(meetingId));
-    // In real app: POST /api/pool/create
     setTimeout(() => navigateToMeeting(meetingId), 600);
   };
 
@@ -119,10 +181,11 @@ export function SetupScreen() {
             meetingCreated={msg.meetingId ? createdMeetings.has(msg.meetingId) : false}
           />
         ))}
+        {isTyping && <TypingIndicator />}
       </div>
 
       {/* Input */}
-      <ChatInput onSend={handleSend} />
+      <ChatInput onSend={handleSend} disabled={isTyping} />
     </div>
   );
 }

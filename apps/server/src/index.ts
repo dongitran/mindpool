@@ -15,6 +15,10 @@ import { RedisStore, type RedisReply } from 'rate-limit-redis';
 
 const app = express();
 
+// Trust the nginx reverse-proxy — needed for rate-limit-redis to identify
+// clients correctly via X-Forwarded-For (nginx sets this header by default)
+app.set('trust proxy', 1);
+
 // CORS — allow localhost in dev, restrict to MINDPOOL_HOST in production
 const allowedOrigins = [
   'http://localhost:3000',
