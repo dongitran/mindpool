@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import { Settings, maskApiKey, encryptApiKey } from '../models';
 import { validate } from '../middleware/validate';
-import { updateSettingsSchema } from '../schemas/settings.schema';
+import { updateSettingsSchema } from '@mindpool/shared';
 
 const router = Router();
 

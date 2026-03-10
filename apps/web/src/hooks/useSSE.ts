@@ -4,8 +4,6 @@ import { api } from '../lib/api';
 
 export function useSSE(poolId: string | null) {
   const esRef = useRef<EventSource | null>(null);
-  // Track the latest message timestamp so reconnects only replay new messages
-  const lastTimestampRef = useRef<string | undefined>(undefined);
   const { addMessage, updateAgentState, updateQueue, setPoolComplete } =
     useMeetingStore();
 
@@ -23,13 +21,9 @@ export function useSSE(poolId: string | null) {
 
           switch (data.type) {
             case 'message':
-              // Replayed stored message — update our timestamp watermark
-              if (data.message?.timestamp) {
-                lastTimestampRef.current = data.message.timestamp;
-              }
+              // EventSource naturally handles Last-Event-ID, no manual tracking needed
               break;
             case 'mindx_announce':
-              lastTimestampRef.current = now;
               addMessage({
                 type: 'mindx',
                 icon: '🧠',
@@ -55,7 +49,6 @@ export function useSSE(poolId: string | null) {
               // Update last typing message with thinking content
               break;
             case 'agent_message':
-              lastTimestampRef.current = now;
               addMessage({
                 type: 'agent',
                 agentId: data.agentId,
@@ -83,13 +76,9 @@ export function useSSE(poolId: string | null) {
       };
 
       es.onerror = () => {
-        es.close();
-        // Reconnect after 3s, passing lastTimestamp so server skips already-seen messages
-        setTimeout(() => {
-          if (esRef.current === es) {
-            connect(lastTimestampRef.current);
-          }
-        }, 3000);
+        // Native EventSource automatically tries to reconnect.
+        // We only close it completely if component unmounts.
+        console.warn('SSE connection error / dropped, browser will reconnect automatically.');
       };
     }
 

@@ -97,7 +97,7 @@ importers:
         specifier: ^8.25.0
         version: 8.56.1(eslint@9.39.4(jiti@1.21.7))(typescript@5.9.3)
       vitest:
-        specifier: ^3.0.0
+        specifier: ^3.2.4
         version: 3.2.4(@types/node@25.3.5)(jiti@1.21.7)(tsx@4.21.0)(yaml@2.8.2)
 
   apps/web:
@@ -183,6 +183,10 @@ importers:
         version: 5.9.3
 
   packages/shared:
+    dependencies:
+      zod:
+        specifier: ^4.3.6
+        version: 4.3.6
     devDependencies:
       typescript:
         specifier: ^5.7.0

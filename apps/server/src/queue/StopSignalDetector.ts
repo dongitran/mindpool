@@ -1,29 +1,43 @@
+import { redis, POOL_LOCK_TTL_SEC } from '../lib/redis';
+
 const STOP_KEYWORDS = ['okay', 'cảm ơn', 'đủ rồi', 'kết thúc'];
 
 export class StopSignalDetector {
-  private signals = {
-    queueEmpty: false,
-    userTrigger: false,
-  };
+  constructor(private poolId: string) { }
 
-  checkQueueEmpty(queueSize: number): void {
-    this.signals.queueEmpty = queueSize === 0;
+  private get key(): string {
+    return `pool:${this.poolId}:signals`;
   }
 
-  checkUserTrigger(message: string): void {
+  async checkQueueEmpty(queueSize: number): Promise<void> {
+    const isQueueEmpty = queueSize === 0;
+    await redis.hset(this.key, 'queueEmpty', isQueueEmpty ? '1' : '0');
+    await redis.expire(this.key, POOL_LOCK_TTL_SEC);
+  }
+
+  async checkUserTrigger(message: string): Promise<void> {
     const lower = message.toLowerCase().trim();
-    this.signals.userTrigger = STOP_KEYWORDS.some((kw) => lower.includes(kw));
+    const isTriggered = STOP_KEYWORDS.some((kw) => lower.includes(kw));
+    if (isTriggered) {
+      await redis.hset(this.key, 'userTrigger', '1');
+      await redis.expire(this.key, POOL_LOCK_TTL_SEC);
+    }
   }
 
-  shouldStop(): boolean {
-    return this.signals.queueEmpty && this.signals.userTrigger;
+  async shouldStop(): Promise<boolean> {
+    const signals = await this.getSignals();
+    return signals.queueEmpty && signals.userTrigger;
   }
 
-  reset(): void {
-    this.signals = { queueEmpty: false, userTrigger: false };
+  async reset(): Promise<void> {
+    await redis.del(this.key);
   }
 
-  getSignals(): { queueEmpty: boolean; userTrigger: boolean } {
-    return { ...this.signals };
+  async getSignals(): Promise<{ queueEmpty: boolean; userTrigger: boolean }> {
+    const data = await redis.hgetall(this.key);
+    return {
+      queueEmpty: data.queueEmpty === '1',
+      userTrigger: data.userTrigger === '1',
+    };
   }
 }

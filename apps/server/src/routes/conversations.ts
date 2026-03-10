@@ -7,7 +7,7 @@ import { validate } from '../middleware/validate';
 import {
   createConversationSchema,
   sendConversationMessageSchema,
-} from '../schemas/conversation.schema';
+} from '@mindpool/shared';
 
 const router = Router();
 

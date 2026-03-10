@@ -4,7 +4,7 @@ import * as mindxService from '../services/mindx.service';
 import { redis, MEETING_QUEUE_KEY } from '../lib/redis';
 import { logger } from '../lib/logger';
 import { validate } from '../middleware/validate';
-import { createPoolSchema, sendMessageSchema } from '../schemas/pool.schema';
+import { createPoolSchema, sendMessageSchema } from '@mindpool/shared';
 
 const router = Router();
 

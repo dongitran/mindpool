@@ -18,12 +18,15 @@ redisSub.on('message', (channel: string, data: string) => {
   const connections = poolConnections.get(poolId);
   if (!connections?.size) return;
 
-  const payload = `data: ${data}\n\n`;
+  // We generate a timestamp for live events so the browser can use it as Last-Event-ID
+  // If the event itself has a timestamp, we could parse it, but a current timestamp is usually fine for live events.
+  const id = new Date().toISOString();
+  const payload = `id: ${id}\ndata: ${data}\n\n`;
   for (const res of connections) {
     try {
       res.write(payload);
     } catch {
-      // Client already disconnected — will be cleaned up on 'close' event
+      // Client already disconnected
     }
   }
 });
@@ -63,8 +66,9 @@ router.get('/:poolId', async (req: Request<{ poolId: string }>, res: Response) =
   // Subscribe to Redis channel for this pool (no-op if already subscribed)
   await subscribePoolChannel(poolId);
 
-  // Send existing messages — support ?after=<ISO> to avoid replaying on reconnect
-  const afterRaw = req.query.after as string | undefined;
+  // Support native SSE Last-Event-ID header or legacy ?after query
+  const lastEventId = req.headers['last-event-id'] as string | undefined;
+  const afterRaw = lastEventId || (req.query.after as string | undefined);
   const afterDate = afterRaw ? new Date(afterRaw) : null;
   const query =
     afterDate && !isNaN(afterDate.getTime())
@@ -74,7 +78,8 @@ router.get('/:poolId', async (req: Request<{ poolId: string }>, res: Response) =
   try {
     const messages = await query.sort({ timestamp: 1 });
     for (const msg of messages) {
-      res.write(`data: ${JSON.stringify({ type: 'message', message: msg })}\n\n`);
+      // Send the actual message timestamp as the id so reconnects skip this exact message
+      res.write(`id: ${msg.timestamp.toISOString()}\ndata: ${JSON.stringify({ type: 'message', message: msg })}\n\n`);
     }
   } catch (err) {
     logger.error('SSE error fetching messages', { error: err });

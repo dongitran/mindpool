@@ -1,4 +1,4 @@
-import type { ChatMessage, RouterConfig } from '@mindpool/shared';
+import type { RouterConfig } from '@mindpool/shared';
 import { LLMRouter } from '../llm/router';
 import { KimiProvider, MinimaxProvider } from '../llm/providers';
 import { QueueManager } from '../queue/QueueManager';
@@ -8,7 +8,12 @@ import { Pool, Agent, Message } from '../models';
 import { poolService } from '../di';
 import { logger } from '../lib/logger';
 import { redis, POOL_LOCK_TTL_SEC, MEETING_QUEUE_KEY } from '../lib/redis';
-import { sendSSEToPool } from '../lib/pubsub';
+import { broadcastService } from './broadcast.service';
+import {
+  generateRelevanceCheckMessages,
+  generateWrapUpMessages,
+  generateAgentResponseMessages,
+} from '../utils/prompt.utils';
 
 // Initialize LLM router from env config
 const routerConfig: RouterConfig = {
@@ -25,10 +30,6 @@ if (config.minimaxApiKey) {
   llmRouter.registerProvider(new MinimaxProvider(config.minimaxApiKey));
 }
 
-// Per-pool in-memory state (same process as worker)
-const poolQueues = new Map<string, QueueManager>();
-const poolStopDetectors = new Map<string, StopSignalDetector>();
-
 function withTimeout<T>(promise: Promise<T>, ms: number, label: string): Promise<T> {
   const timeout = new Promise<never>((_, reject) =>
     setTimeout(() => reject(new Error(`[MindX] Timeout after ${ms}ms: ${label}`)), ms)
@@ -37,17 +38,11 @@ function withTimeout<T>(promise: Promise<T>, ms: number, label: string): Promise
 }
 
 function getQueueManager(poolId: string): QueueManager {
-  if (!poolQueues.has(poolId)) {
-    poolQueues.set(poolId, new QueueManager());
-  }
-  return poolQueues.get(poolId)!;
+  return new QueueManager(poolId);
 }
 
 function getStopDetector(poolId: string): StopSignalDetector {
-  if (!poolStopDetectors.has(poolId)) {
-    poolStopDetectors.set(poolId, new StopSignalDetector());
-  }
-  return poolStopDetectors.get(poolId)!;
+  return new StopSignalDetector(poolId);
 }
 
 export async function analyzeTopicAndSuggestAgents(topic: string) {
@@ -107,7 +102,7 @@ export async function generateAnnouncement(poolId: string): Promise<string> {
     content: announcement,
   });
 
-  await sendSSEToPool(poolId, { type: 'mindx_announce', content: announcement });
+  await broadcastService.broadcastAnnouncement(poolId, announcement);
 
   return announcement;
 }
@@ -119,17 +114,7 @@ export async function runRelevanceCheck(
   poolContext: string
 ): Promise<boolean> {
   try {
-    const messages: ChatMessage[] = [
-      {
-        role: 'system',
-        content:
-          'You are a relevance checker. Given an agent specialty and the latest discussion message, respond with only "yes" or "no" — should this agent contribute?',
-      },
-      {
-        role: 'user',
-        content: `Agent specialty: ${agentSpecialty}\nLatest message: ${latestMessage}\nContext: ${poolContext}\n\nShould this agent raise hand?`,
-      },
-    ];
+    const messages = generateRelevanceCheckMessages(agentSpecialty, latestMessage, poolContext);
 
     const result = await withTimeout(
       llmRouter.agentChat('relevance_check', messages, { maxTokens: 10, temperature: 0.1 }),
@@ -153,14 +138,7 @@ export async function generateWrapUp(poolId: string): Promise<string> {
   const transcript = messages.map((m) => `[${m.agentId}]: ${m.content}`).join('\n');
 
   try {
-    const chatMessages: ChatMessage[] = [
-      {
-        role: 'system',
-        content:
-          'Summarize this meeting discussion in Vietnamese. Be concise. Highlight key insights and action items.',
-      },
-      { role: 'user', content: transcript },
-    ];
+    const chatMessages = generateWrapUpMessages(transcript);
 
     const result = await withTimeout(
       llmRouter.agentChat('full_response', chatMessages, { maxTokens: 1024, temperature: 0.5 }),
@@ -176,7 +154,7 @@ export async function generateWrapUp(poolId: string): Promise<string> {
     });
 
     await poolService.updatePoolStatus(poolId, 'completed');
-    await sendSSEToPool(poolId, { type: 'pool_complete', wrapUp, status: 'completed' });
+    await broadcastService.broadcastPoolComplete(poolId, wrapUp);
 
     return wrapUp;
   } catch (error) {
@@ -184,7 +162,7 @@ export async function generateWrapUp(poolId: string): Promise<string> {
     const fallback = 'Cuộc thảo luận đã kết thúc. Cảm ơn các chuyên gia đã tham gia!';
     await poolService.addMessage(poolId, { agentId: 'mindx', content: fallback });
     await poolService.updatePoolStatus(poolId, 'completed');
-    await sendSSEToPool(poolId, { type: 'pool_complete', wrapUp: fallback, status: 'completed' });
+    await broadcastService.broadcastPoolComplete(poolId, fallback);
     return fallback;
   }
 }
@@ -201,9 +179,10 @@ export async function handleMeetingLoop(poolId: string): Promise<void> {
   try {
     const pool = await Pool.findById(poolId);
     if (!pool || pool.status !== 'active') {
-      // Cleanup in-memory state for pools that are gone or no longer active
-      poolQueues.delete(poolId);
-      poolStopDetectors.delete(poolId);
+      const qm = getQueueManager(poolId);
+      const sd = getStopDetector(poolId);
+      await qm.clear();
+      await sd.reset();
       return;
     }
 
@@ -223,7 +202,7 @@ export async function handleMeetingLoop(poolId: string): Promise<void> {
       .map((a) => a.agentId);
 
     // Pop next speaker before relevance checks (FIFO)
-    const nextAgentId = queueManager.popFromQueue();
+    const nextAgentId = await queueManager.popFromQueue();
 
     // Fetch all needed agent docs in one DB call
     const allNeededIds = [...new Set([...listeningAgentIds, ...(nextAgentId ? [nextAgentId] : [])])];
@@ -248,14 +227,18 @@ export async function handleMeetingLoop(poolId: string): Promise<void> {
     for (const result of relevanceResults) {
       if (result.status !== 'fulfilled') continue;
       const { agentId, shouldSpeak } = result.value;
-      if (shouldSpeak && queueManager.addToQueue(agentId)) {
-        await poolService.updateAgentState(poolId, agentId, 'queued');
-        await sendSSEToPool(poolId, { type: 'agent_state', agentId, state: 'queued' });
+      if (shouldSpeak) {
+        const added = await queueManager.addToQueue(agentId);
+        if (added) {
+          await poolService.updateAgentState(poolId, agentId, 'queued');
+          await broadcastService.broadcastAgentState(poolId, agentId, 'queued');
+        }
       }
     }
 
     // Broadcast updated queue
-    await sendSSEToPool(poolId, { type: 'queue_update', queue: queueManager.getQueue() });
+    const queueState = await queueManager.getQueue();
+    await broadcastService.broadcastQueueUpdate(poolId, queueState);
 
     // Let next agent speak
     if (nextAgentId) {
@@ -263,32 +246,15 @@ export async function handleMeetingLoop(poolId: string): Promise<void> {
       if (agentDoc) {
         // Mark as speaking
         await poolService.updateAgentState(poolId, nextAgentId, 'speaking');
-        await sendSSEToPool(poolId, {
-          type: 'agent_typing',
-          agentId: nextAgentId,
-          agentName: agentDoc.name,
-          icon: agentDoc.icon,
-          role: agentDoc.specialty,
-        });
+        await broadcastService.broadcastAgentTyping(
+          poolId,
+          nextAgentId,
+          agentDoc.name,
+          agentDoc.icon,
+          agentDoc.specialty
+        );
 
-        const history = [...latestMessages].reverse().map((m) => ({
-          role: 'user' as const,
-          content: `[${m.agentId}]: ${m.content}`,
-        }));
-
-        const chatMessages: ChatMessage[] = [
-          {
-            role: 'system',
-            content:
-              agentDoc.systemPrompt ||
-              `You are ${agentDoc.name}, an expert in ${agentDoc.specialty}. Respond in Vietnamese. Be concise and insightful.`,
-          },
-          ...history,
-          {
-            role: 'user',
-            content: `Based on the discussion, share your perspective as ${agentDoc.name}.`,
-          },
-        ];
+        const chatMessages = generateAgentResponseMessages(agentDoc, [...latestMessages].reverse());
 
         try {
           const startTime = Date.now();
@@ -304,39 +270,40 @@ export async function handleMeetingLoop(poolId: string): Promise<void> {
           await poolService.addMessage(poolId, { agentId: nextAgentId, content, thinkSec });
 
           // Emit the message event
-          await sendSSEToPool(poolId, {
-            type: 'agent_message',
-            agentId: nextAgentId,
-            agentName: agentDoc.name,
-            icon: agentDoc.icon,
+          await broadcastService.broadcastAgentMessage(
+            poolId,
+            nextAgentId,
+            agentDoc.name,
+            agentDoc.icon,
             content,
-            thinkSec,
-          });
+            thinkSec
+          );
         } catch (error) {
           logger.error('Agent failed to respond', { agent: agentDoc.name, poolId, error });
-          await sendSSEToPool(poolId, {
-            type: 'error',
-            message: `${agentDoc.name} không phản hồi được. Tiếp tục...`,
-          });
+          await broadcastService.broadcastError(
+            poolId,
+            `${agentDoc.name} không phản hồi được. Tiếp tục...`
+          );
         }
 
         // Mark as done / back to listening
         await poolService.updateAgentState(poolId, nextAgentId, 'listening');
-        await sendSSEToPool(poolId, { type: 'agent_done', agentId: nextAgentId });
+        await broadcastService.broadcastAgentDone(poolId, nextAgentId);
       }
     }
 
     // Check stop signals
-    stopDetector.checkQueueEmpty(queueManager.getSize());
-    if (stopDetector.shouldStop()) {
+    const currentQueueSize = await queueManager.getSize();
+    await stopDetector.checkQueueEmpty(currentQueueSize);
+    if (await stopDetector.shouldStop()) {
       await generateWrapUp(poolId);
-      // Cleanup in-memory state
-      poolQueues.delete(poolId);
-      poolStopDetectors.delete(poolId);
-    } else if (queueManager.getSize() > 0) {
+      // Cleanup Redis state for this pool
+      await queueManager.clear();
+      await stopDetector.reset();
+    } else if (currentQueueSize > 0) {
       // Re-enqueue so the next agent in the queue gets to speak
       await redis.rpush(MEETING_QUEUE_KEY, JSON.stringify({ poolId }));
-      logger.info('[MindX] Re-enqueued meeting loop for next turn', { poolId, queueSize: queueManager.getSize() });
+      logger.info('[MindX] Re-enqueued meeting loop for next turn', { poolId, queueSize: currentQueueSize });
     }
   } finally {
     // Always release lock

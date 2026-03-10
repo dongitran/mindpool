@@ -2,6 +2,43 @@ import type { AgentState, Pool as SharedPool } from '@mindpool/shared';
 import type { Model } from 'mongoose';
 import type { PoolDocument, AgentDocument, MessageDocument } from '../models';
 
+export function mapPoolDocToShared(doc: PoolDocument): SharedPool {
+  return {
+    _id: doc._id.toString(),
+    title: doc.title,
+    topic: doc.topic,
+    status: doc.status,
+    agents: doc.agents.map((a) => ({
+      agentId: a.agentId,
+      icon: a.icon,
+      name: a.name,
+      role: a.role,
+      state: a.state as 'speaking' | 'queued' | 'listening',
+      queuePosition: a.queuePosition,
+    })),
+    messages: doc.messages.map((m) => m.toString()),
+    queue: doc.queue,
+    conversationId: doc.conversationId,
+    statusText: doc.statusText,
+    duration: doc.duration,
+    sendAgents: doc.sendAgents.map((sa) => ({
+      icon: sa.icon,
+      name: sa.name,
+      role: sa.role,
+    })),
+    mapCenter: doc.mapCenter,
+    mapCenterSub: doc.mapCenterSub,
+    mapNodes: doc.mapNodes.map((n) => ({
+      label: n.label,
+      sub: n.sub,
+      val: n.val,
+      color: n.color,
+    })),
+    createdAt: doc.get?.('createdAt')?.toISOString?.() || new Date().toISOString(),
+    updatedAt: doc.get?.('updatedAt')?.toISOString?.() || new Date().toISOString(),
+  };
+}
+
 export function buildPoolService({
   Pool,
   Agent,
@@ -48,7 +85,7 @@ export function buildPoolService({
         mapNodes: [],
       });
 
-      return pool as unknown as SharedPool;
+      return mapPoolDocToShared(pool);
     },
 
     async getPool(id: string) {
