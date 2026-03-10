@@ -21,11 +21,11 @@ interface DiscussionFeedProps {
 
 function TypingIndicator() {
   return (
-    <div className="flex items-center gap-1 px-[13px] py-2.5 bg-[var(--surface-2)] border border-[var(--border)] rounded-[14px] rounded-tl w-fit">
+    <div className="flex items-center gap-1 px-[13px] py-2.5 bg-surface-2 border border-border rounded-[14px] rounded-tl w-fit">
       {[0, 0.2, 0.4].map((delay, i) => (
         <div
           key={i}
-          className="w-[5px] h-[5px] bg-[var(--text-muted)] rounded-full animate-typing-bounce"
+          className="w-[5px] h-[5px] bg-text-muted rounded-full animate-typing-bounce"
           style={{ animationDelay: `${delay}s` }}
         />
       ))}
@@ -64,10 +64,10 @@ export function DiscussionFeed({ messages, showThinkingDefault = false }: Discus
           return (
             <div key={i} className="mb-[18px] flex justify-end animate-msg-in">
               <div className="max-w-[460px]">
-                <div className="px-4 py-[11px] bg-[var(--accent-dim)] border border-[rgba(61,255,192,0.2)] rounded-[14px] rounded-tl-[14px] rounded-tr text-[13.5px] leading-relaxed text-[var(--text)]">
+                <div className="px-4 py-[11px] bg-accent-dim border border-[rgba(61,255,192,0.2)] rounded-[14px] rounded-tl-[14px] rounded-tr text-[13.5px] leading-relaxed text-text">
                   {msg.content}
                 </div>
-                <div className="text-right text-[10px] text-[var(--text-dim)] mt-1">
+                <div className="text-right text-[10px] text-text-dim mt-1">
                   {formatTime(msg.timestamp)}
                 </div>
               </div>
@@ -81,14 +81,14 @@ export function DiscussionFeed({ messages, showThinkingDefault = false }: Discus
               <div className="flex items-center gap-[7px] mb-1.5">
                 <span className="text-[17px]">{msg.icon}</span>
                 <div>
-                  <div className="text-[12.5px] font-semibold text-[var(--text)]">
+                  <div className="text-[12.5px] font-semibold text-text">
                     {msg.agentName}
                   </div>
-                  <div className="text-[10.5px] text-[var(--accent)]">
+                  <div className="text-[10.5px] text-accent">
                     đang phát biểu...
                   </div>
                 </div>
-                <div className="text-[10px] text-[var(--text-dim)] ml-auto">
+                <div className="text-[10px] text-text-dim ml-auto">
                   {formatTime(msg.timestamp)}
                 </div>
               </div>
@@ -104,14 +104,14 @@ export function DiscussionFeed({ messages, showThinkingDefault = false }: Discus
             <div className="flex items-center gap-[7px] mb-1.5">
               <span className="text-[17px]">{msg.icon || '🧠'}</span>
               <div>
-                <div className="text-[12.5px] font-semibold text-[var(--text)]">
+                <div className="text-[12.5px] font-semibold text-text">
                   {msg.agentName || 'MindX'}
                 </div>
-                <div className="text-[10.5px] text-[var(--text-muted)]">
+                <div className="text-[10.5px] text-text-muted">
                   {msg.role || 'Orchestrator'}
                 </div>
               </div>
-              <div className="text-[10px] text-[var(--text-dim)] ml-auto">
+              <div className="text-[10px] text-text-dim ml-auto">
                 {formatTime(msg.timestamp)}
               </div>
             </div>
@@ -123,10 +123,10 @@ export function DiscussionFeed({ messages, showThinkingDefault = false }: Discus
               />
             )}
             <div
-              className={`px-4 py-[11px] rounded-[14px] rounded-tl text-[13.5px] leading-relaxed text-[var(--text)] ${
+              className={`px-4 py-[11px] rounded-[14px] rounded-tl text-[13.5px] leading-relaxed text-text ${
                 isMindX
-                  ? 'bg-[rgba(61,255,192,0.05)] border border-[rgba(61,255,192,0.2)] border-l-2 border-l-[var(--accent)]'
-                  : 'bg-[var(--surface-2)] border border-[var(--border)]'
+                  ? 'bg-[rgba(61,255,192,0.05)] border border-[rgba(61,255,192,0.2)] border-l-2 border-l-accent'
+                  : 'bg-surface-2 border border-border'
               }`}
               dangerouslySetInnerHTML={{ __html: sanitizeHTML(msg.content) }}
             />

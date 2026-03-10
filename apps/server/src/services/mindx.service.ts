@@ -5,7 +5,7 @@ import { QueueManager } from '../queue/QueueManager';
 import { StopSignalDetector } from '../queue/StopSignalDetector';
 import { config } from '../config';
 import { Pool, Agent, Message } from '../models';
-import * as poolService from './pool.service';
+import { poolService } from '../di';
 import { logger } from '../lib/logger';
 import { redis, POOL_LOCK_TTL_SEC, MEETING_QUEUE_KEY } from '../lib/redis';
 import { sendSSEToPool } from '../lib/pubsub';
@@ -58,7 +58,7 @@ export async function analyzeTopicAndSuggestAgents(topic: string) {
     const specialtyLower = agent.specialty.toLowerCase();
     const relevance =
       topicLower.includes(specialtyLower) ||
-      specialtyLower.split(' ').some((word) => topicLower.includes(word))
+        specialtyLower.split(' ').some((word) => topicLower.includes(word))
         ? 0.8
         : 0.3;
 

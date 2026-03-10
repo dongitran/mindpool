@@ -7,7 +7,7 @@ export function Toggle({ checked, onChange }: ToggleProps) {
   return (
     <div
       className={`w-9 h-5 rounded-full cursor-pointer relative transition-colors duration-200 flex-shrink-0 ${
-        checked ? 'bg-[var(--accent)]' : 'bg-[var(--border-light)]'
+        checked ? 'bg-accent' : 'bg-[var(--border-light)]'
       }`}
       onClick={() => onChange(!checked)}
     >

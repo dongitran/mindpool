@@ -104,17 +104,23 @@ async function start() {
       logger.info(`Server running on http://localhost:${config.port}`);
     });
 
-    // Start background worker in same process (non-blocking)
-    startWorker().catch((err) => {
-      logger.error('Worker crashed', { error: err });
-    });
-    logger.info('Meeting loop worker started');
+    // Start background worker in same process (Conditionally for local dev)
+    if (process.env.RUN_WORKER !== 'false') {
+      startWorker().catch((err) => {
+        logger.error('Worker crashed', { error: err });
+      });
+      logger.info('Meeting loop worker started in same process (Legacy dev mode)');
+    } else {
+      logger.info('Meeting loop worker disabled in API process (RUN_WORKER=false)');
+    }
 
     // Graceful shutdown
     const shutdown = async (signal: string) => {
       logger.info(`${signal} received, shutting down gracefully`);
 
-      stopWorker();
+      if (process.env.RUN_WORKER !== 'false') {
+        stopWorker();
+      }
 
       server.close(async () => {
         await mongoose.disconnect();

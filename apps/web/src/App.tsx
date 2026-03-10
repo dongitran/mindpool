@@ -7,7 +7,7 @@ import { MeetingScreen } from './screens/MeetingScreen';
 import { HistoryScreen } from './screens/HistoryScreen';
 import { SettingsScreen } from './screens/SettingsScreen';
 import { ErrorBoundary } from './components/ErrorBoundary';
-import { api } from './lib/api';
+import { useConversations, usePools } from './hooks/useApiQueries';
 
 function CurrentScreen() {
   const screen = useAppStore((s) => s.currentScreen);
@@ -35,11 +35,11 @@ function ErrorBanner() {
   if (!error) return null;
 
   return (
-    <div className="flex items-center justify-between px-4 py-2 bg-[var(--red)]/15 border-b border-[var(--red)]/30 text-[var(--red)] text-sm">
+    <div className="flex items-center justify-between px-4 py-2 bg-red/15 border-b border-red/30 text-red text-sm">
       <span>{error}</span>
       <button
         onClick={clearError}
-        className="ml-3 px-2 py-0.5 rounded text-xs hover:bg-[var(--red)]/20 transition-colors"
+        className="ml-3 px-2 py-0.5 rounded text-xs hover:bg-red/20 transition-colors"
       >
         Dismiss
       </button>
@@ -48,19 +48,18 @@ function ErrorBanner() {
 }
 
 export default function App() {
-  const { setConversations, setPools, setError, conversations, pools } = useAppStore();
+  const { setError } = useAppStore();
+  const { data: conversations = [], error: convError } = useConversations();
+  const { data: pools = [], error: poolsError } = usePools();
 
   useEffect(() => {
-    api.getConversations()
-      .then((data) => setConversations(Array.isArray(data) ? data : []))
-      .catch(() => setError('Không thể tải danh sách conversations'));
-    api.getPools()
-      .then((data) => setPools(Array.isArray(data) ? data : []))
-      .catch(() => setError('Không thể tải danh sách pools'));
-  }, [setConversations, setPools, setError]);
+    if (convError || poolsError) {
+      setError('Không thể tải dữ liệu server');
+    }
+  }, [convError, poolsError, setError]);
 
   return (
-    <div className="flex w-full h-screen overflow-hidden bg-[var(--bg)] text-[var(--text)]">
+    <div className="flex w-full h-screen overflow-hidden bg-bg text-text">
       <Sidebar
         meetings={pools.map((p) => ({
           _id: p._id,

@@ -30,6 +30,6 @@ export const useSettingsStore = create<SettingsState>((set) => ({
   accentColor: '#3dffc0',
   apiKeys: {},
 
-  updateSetting: (key, value) => set({ [key]: value } as any),
+  updateSetting: (key, value) => set({ [key]: value } as Partial<SettingsState>),
   setAll: (settings) => set(settings),
 }));

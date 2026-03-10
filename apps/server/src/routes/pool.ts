@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import * as poolService from '../services/pool.service';
+import { poolService } from '../di';
 import * as mindxService from '../services/mindx.service';
 import { redis, MEETING_QUEUE_KEY } from '../lib/redis';
 import { logger } from '../lib/logger';
@@ -20,10 +20,10 @@ router.post('/pool/create', validate(createPoolSchema), async (req, res, next) =
     await mindxService.generateAnnouncement(poolId);
 
     // Select opening agent and seed the in-memory queue
-    const agents = pool.agents.map((a) => ({
+    const agents = pool.agents.map((a: { agentId: string; name: string; role?: string }) => ({
       agentId: a.agentId,
       name: a.name,
-      specialty: a.role,
+      specialty: a.role || '',
     }));
     const openingAgent = await mindxService.selectOpeningAgent(topic, agents);
     mindxService.getQueueManager(poolId).addToQueue(openingAgent.agentId);

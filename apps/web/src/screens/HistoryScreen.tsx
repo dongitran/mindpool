@@ -1,7 +1,6 @@
-import { useEffect, useState } from 'react';
 import { useAppStore } from '../stores/appStore';
 import { Tag } from '../components/ui/Tag';
-import { api } from '../lib/api';
+import { usePools } from '../hooks/useApiQueries';
 
 interface PoolCard {
   _id: string;
@@ -26,13 +25,10 @@ function timeGroup(dateStr: string): string {
 
 export function HistoryScreen() {
   const { navigateToMeeting } = useAppStore();
-  const [pools, setPools] = useState<PoolCard[]>([]);
+  const { data: queryPools = [] } = usePools();
 
-  useEffect(() => {
-    api.getPools().then((data) => {
-      setPools(Array.isArray(data) ? (data as PoolCard[]) : []);
-    }).catch(() => setPools([]));
-  }, []);
+  // Cast since UI expects extra optional props temporarily
+  const pools = queryPools as unknown as PoolCard[];
 
   // Group by time
   const grouped: Record<string, PoolCard[]> = {};
@@ -48,10 +44,10 @@ export function HistoryScreen() {
   return (
     <div className="flex-1 overflow-y-auto px-[38px] py-[30px] scrollbar-thin">
       <div className="mb-7">
-        <h1 className="font-['DM_Serif_Display',serif] text-[26px] text-[var(--text)] mb-[5px]">
+        <h1 className="font-['DM_Serif_Display',serif] text-[26px] text-text mb-[5px]">
           Your Mindpools
         </h1>
-        <p className="text-[13.5px] text-[var(--text-muted)]">
+        <p className="text-[13.5px] text-text-muted">
           Tất cả các cuộc họp đã tạo · {totalPools} pools
         </p>
       </div>
@@ -61,7 +57,7 @@ export function HistoryScreen() {
           grouped[section] &&
           grouped[section].length > 0 && (
             <div key={section}>
-              <div className="text-[10px] font-semibold uppercase tracking-[1.2px] text-[var(--text-dim)] mb-[11px] pb-[7px] border-b border-[var(--border)]">
+              <div className="text-[10px] font-semibold uppercase tracking-[1.2px] text-text-dim mb-[11px] pb-[7px] border-b border-border">
                 {section}
               </div>
               <div className="grid grid-cols-[repeat(auto-fill,minmax(290px,1fr))] gap-3.5 mb-7">
@@ -69,23 +65,23 @@ export function HistoryScreen() {
                   <div
                     key={pool._id}
                     onClick={() => navigateToMeeting(pool._id)}
-                    className="p-4 px-[18px] bg-[var(--surface-1)] border border-[var(--border)] rounded-[var(--radius)] cursor-pointer transition-all relative overflow-hidden group hover:border-[var(--border-light)] hover:bg-[var(--surface-2)] hover:translate-y-[-2px]"
+                    className="p-4 px-[18px] bg-surface-1 border border-border rounded cursor-pointer transition-all relative overflow-hidden group hover:border-border-light hover:bg-surface-2 hover:translate-y-[-2px]"
                   >
-                    <div className="absolute bottom-0 left-0 right-0 h-px bg-gradient-to-r from-[var(--accent)] to-transparent opacity-0 transition-opacity group-hover:opacity-100" />
-                    <div className="text-sm font-semibold text-[var(--text)] mb-[7px]">
+                    <div className="absolute bottom-0 left-0 right-0 h-px bg-gradient-to-r from-accent to-transparent opacity-0 transition-opacity group-hover:opacity-100" />
+                    <div className="text-sm font-semibold text-text mb-[7px]">
                       {pool.title}
                     </div>
                     <div className="flex gap-[5px] mb-2.5 flex-wrap">
                       {pool.agents?.map((a, i) => (
                         <div
                           key={i}
-                          className="px-2.5 py-0.5 bg-[var(--surface-2)] border border-[var(--border-light)] rounded-full text-[10.5px] text-[var(--text-muted)] flex items-center gap-1"
+                          className="px-2.5 py-0.5 bg-surface-2 border border-border-light rounded-full text-[10.5px] text-text-muted flex items-center gap-1"
                         >
                           {a.icon}
                         </div>
                       ))}
                     </div>
-                    <div className="flex items-center justify-between text-[10.5px] text-[var(--text-muted)]">
+                    <div className="flex items-center justify-between text-[10.5px] text-text-muted">
                       <Tag variant={pool.status === 'active' ? 'green' : 'amber'}>
                         {pool.status === 'active' ? '● Live' : 'Completed'}
                       </Tag>
@@ -102,7 +98,7 @@ export function HistoryScreen() {
       )}
 
       {totalPools === 0 && (
-        <div className="text-center text-[var(--text-muted)] mt-20">
+        <div className="text-center text-text-muted mt-20">
           <div className="text-4xl mb-4">🧠</div>
           <p>Chưa có pool nào. Hãy tạo Mindpool đầu tiên!</p>
         </div>

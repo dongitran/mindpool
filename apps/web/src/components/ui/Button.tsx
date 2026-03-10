@@ -9,15 +9,15 @@ interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
 
 const styles: Record<Variant, string> = {
   primary:
-    'bg-gradient-to-br from-[var(--accent)] to-[#2de8a8] text-[var(--bg)] font-bold hover:translate-y-[-1px] hover:shadow-[0_8px_24px_rgba(61,255,192,0.3)]',
+    'bg-gradient-to-br from-accent to-[#2de8a8] text-bg font-bold hover:translate-y-[-1px] hover:shadow-[0_8px_24px_rgba(61,255,192,0.3)]',
   outline:
-    'bg-transparent border border-[var(--border-light)] text-[var(--text-muted)] hover:border-[var(--border-light)] hover:text-[var(--text)]',
+    'bg-transparent border border-border-light text-text-muted hover:border-border-light hover:text-text',
   danger:
-    'bg-[rgba(255,107,107,0.08)] border border-[rgba(255,107,107,0.25)] text-[var(--red)] hover:bg-[rgba(255,107,107,0.15)]',
+    'bg-[rgba(255,107,107,0.08)] border border-[rgba(255,107,107,0.25)] text-red hover:bg-[rgba(255,107,107,0.15)]',
   accent:
-    'bg-[var(--accent-dim)] border border-[rgba(61,255,192,0.3)] text-[var(--accent)] font-semibold hover:bg-[rgba(61,255,192,0.18)]',
+    'bg-accent-dim border border-[rgba(61,255,192,0.3)] text-accent font-semibold hover:bg-[rgba(61,255,192,0.18)]',
   ghost:
-    'bg-transparent text-[var(--text-muted)] hover:bg-[var(--surface-2)] hover:text-[var(--text)]',
+    'bg-transparent text-text-muted hover:bg-surface-2 hover:text-text',
 };
 
 export function Button({
@@ -31,7 +31,7 @@ export function Button({
 
   return (
     <button
-      className={`inline-flex items-center justify-center gap-2 rounded-[var(--radius-xs)] font-[Sora] transition-all duration-150 cursor-pointer ${sizeClass} ${styles[variant]} ${className}`}
+      className={`inline-flex items-center justify-center gap-2 rounded-xs font-[Sora] transition-all duration-150 cursor-pointer ${sizeClass} ${styles[variant]} ${className}`}
       {...props}
     >
       {children}

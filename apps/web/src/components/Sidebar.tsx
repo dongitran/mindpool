@@ -38,23 +38,23 @@ export function Sidebar({ meetings, conversations }: SidebarProps) {
   } = useAppStore();
 
   return (
-    <div className="w-[var(--sidebar-w)] flex-shrink-0 bg-[var(--surface-1)] border-r border-[var(--border)] flex flex-col h-screen overflow-hidden">
+    <div className="w-[var(--sidebar-w)] flex-shrink-0 bg-surface-1 border-r border-border flex flex-col h-screen overflow-hidden">
       {/* Top */}
-      <div className="px-3.5 pt-[18px] pb-3.5 border-b border-[var(--border)] flex-shrink-0">
+      <div className="px-3.5 pt-[18px] pb-3.5 border-b border-border flex-shrink-0">
         <div
           className="flex items-center gap-2.5 mb-3.5 cursor-pointer"
           onClick={() => setScreen('welcome')}
         >
-          <div className="w-[30px] h-[30px] bg-gradient-to-br from-[var(--accent)] to-[var(--purple)] rounded-lg flex items-center justify-center text-[15px]">
+          <div className="w-[30px] h-[30px] bg-gradient-to-br from-accent to-purple rounded-lg flex items-center justify-center text-[15px]">
             🧠
           </div>
-          <span className="font-['DM_Serif_Display',serif] text-[19px] bg-gradient-to-br from-[var(--accent)] to-[var(--purple)] bg-clip-text text-transparent">
+          <span className="font-['DM_Serif_Display',serif] text-[19px] bg-gradient-to-br from-accent to-purple bg-clip-text text-transparent">
             Mindpool
           </span>
         </div>
         <button
           onClick={() => navigateToSetup()}
-          className="w-full py-2.5 px-3.5 bg-[var(--accent-dim)] border border-[rgba(61,255,192,0.22)] rounded-[var(--radius-sm)] text-[var(--accent)] font-[Sora] text-[13px] font-semibold cursor-pointer flex items-center gap-2 transition-all hover:bg-[rgba(61,255,192,0.18)] hover:border-[rgba(61,255,192,0.38)]"
+          className="w-full py-2.5 px-3.5 bg-accent-dim border border-[rgba(61,255,192,0.22)] rounded-sm text-accent font-[Sora] text-[13px] font-semibold cursor-pointer flex items-center gap-2 transition-all hover:bg-[rgba(61,255,192,0.18)] hover:border-[rgba(61,255,192,0.38)]"
         >
           <span>✦</span> New Pool
         </button>
@@ -64,7 +64,7 @@ export function Sidebar({ meetings, conversations }: SidebarProps) {
       <div className="flex-1 flex flex-col overflow-hidden">
         {/* Meetings — 50% */}
         <div className="flex-1 overflow-y-auto px-2 pt-1 scrollbar-thin">
-          <div className="px-2 pt-3 pb-1.5 text-[10px] font-semibold uppercase tracking-[1.2px] text-[var(--text-dim)]">
+          <div className="px-2 pt-3 pb-1.5 text-[10px] font-semibold uppercase tracking-[1.2px] text-text-dim">
             Meetings
           </div>
 
@@ -72,22 +72,22 @@ export function Sidebar({ meetings, conversations }: SidebarProps) {
             <div
               key={m._id}
               onClick={() => navigateToMeeting(m._id)}
-              className={`flex items-center gap-2.5 py-2.5 px-2.5 rounded-[var(--radius-sm)] cursor-pointer transition-colors mb-0.5 ${currentScreen === 'meeting' && currentMeetingId === m._id
-                  ? 'bg-[var(--surface-3)]'
-                  : 'hover:bg-[var(--surface-2)]'
+              className={`flex items-center gap-2.5 py-2.5 px-2.5 rounded-sm cursor-pointer transition-colors mb-0.5 ${currentScreen === 'meeting' && currentMeetingId === m._id
+                  ? 'bg-surface-3'
+                  : 'hover:bg-surface-2'
                 }`}
             >
               <div
                 className={`w-[7px] h-[7px] rounded-full flex-shrink-0 ${m.status === 'active'
-                    ? 'bg-[var(--accent)] animate-pulse'
-                    : 'bg-[var(--amber)]'
+                    ? 'bg-accent animate-pulse'
+                    : 'bg-amber'
                   }`}
               />
               <div className="flex-1 min-w-0">
-                <div className="text-[12.5px] font-medium text-[var(--text)] truncate">
+                <div className="text-[12.5px] font-medium text-text truncate">
                   {m.title}
                 </div>
-                <div className="text-[10.5px] text-[var(--text-muted)] mt-px">
+                <div className="text-[10.5px] text-text-muted mt-px">
                   {formatMeta(m)}
                 </div>
               </div>
@@ -100,7 +100,7 @@ export function Sidebar({ meetings, conversations }: SidebarProps) {
 
         {/* Conversations — 50% */}
         <div className="flex-1 overflow-y-auto px-2 pt-1 pb-2 scrollbar-thin">
-          <div className="px-2 pt-3 pb-1.5 text-[10px] font-semibold uppercase tracking-[1.2px] text-[var(--text-dim)]">
+          <div className="px-2 pt-3 pb-1.5 text-[10px] font-semibold uppercase tracking-[1.2px] text-text-dim">
             Conversations
           </div>
 
@@ -108,15 +108,15 @@ export function Sidebar({ meetings, conversations }: SidebarProps) {
             <div key={c._id}>
               <div
                 onClick={() => navigateToSetup(c._id)}
-                className={`py-2.5 px-2.5 rounded-[var(--radius-sm)] cursor-pointer transition-colors mb-0.5 ${currentScreen === 'setup' && currentConversationId === c._id
-                    ? 'bg-[var(--surface-3)]'
-                    : 'hover:bg-[var(--surface-2)]'
+                className={`py-2.5 px-2.5 rounded-sm cursor-pointer transition-colors mb-0.5 ${currentScreen === 'setup' && currentConversationId === c._id
+                    ? 'bg-surface-3'
+                    : 'hover:bg-surface-2'
                   }`}
               >
-                <div className="text-[12.5px] text-[var(--text)] truncate mb-1">
+                <div className="text-[12.5px] text-text truncate mb-1">
                   {c.title}
                 </div>
-                <div className="text-[10.5px] text-[var(--text-muted)]">{c.sub}</div>
+                <div className="text-[10.5px] text-text-muted">{c.sub}</div>
 
                 {/* Meeting chips inside conversation */}
                 {c.meetings && c.meetings.length > 0 && (
@@ -128,16 +128,16 @@ export function Sidebar({ meetings, conversations }: SidebarProps) {
                           e.stopPropagation();
                           navigateToMeeting(m._id);
                         }}
-                        className="py-[5px] px-2.5 bg-[var(--surface-3)] border border-[var(--border-light)] rounded-md cursor-pointer transition-all flex items-center gap-1.5 hover:border-[var(--accent)] hover:bg-[var(--accent-dim)]"
+                        className="py-[5px] px-2.5 bg-surface-3 border border-border-light rounded-md cursor-pointer transition-all flex items-center gap-1.5 hover:border-accent hover:bg-accent-dim"
                       >
                         <div
-                          className={`w-[5px] h-[5px] rounded-full flex-shrink-0 ${m.status === 'active' ? 'bg-[var(--accent)]' : 'bg-[var(--amber)]'
+                          className={`w-[5px] h-[5px] rounded-full flex-shrink-0 ${m.status === 'active' ? 'bg-accent' : 'bg-amber'
                             }`}
                         />
-                        <span className="text-[11px] text-[var(--text-muted)] flex-1 truncate">
+                        <span className="text-[11px] text-text-muted flex-1 truncate">
                           {m.title}
                         </span>
-                        <span className="text-[10px] text-[var(--text-dim)]">→</span>
+                        <span className="text-[10px] text-text-dim">→</span>
                       </div>
                     ))}
                   </div>
@@ -149,12 +149,12 @@ export function Sidebar({ meetings, conversations }: SidebarProps) {
       </div>
 
       {/* Footer */}
-      <div className="px-2 py-2 pb-3 border-t border-[var(--border)] flex-shrink-0">
+      <div className="px-2 py-2 pb-3 border-t border-border flex-shrink-0">
         {(['history', 'settings'] as Screen[]).map((s) => (
           <div
             key={s}
             onClick={() => setScreen(s)}
-            className={`flex items-center gap-2 py-[7px] px-2.5 rounded-[var(--radius-sm)] cursor-pointer text-[12.5px] text-[var(--text-muted)] transition-all hover:bg-[var(--surface-2)] hover:text-[var(--text)] ${currentScreen === s ? 'bg-[var(--surface-3)] text-[var(--text)]' : ''
+            className={`flex items-center gap-2 py-[7px] px-2.5 rounded-sm cursor-pointer text-[12.5px] text-text-muted transition-all hover:bg-surface-2 hover:text-text ${currentScreen === s ? 'bg-surface-3 text-text' : ''
               }`}
           >
             <span className="text-[13px]">{s === 'history' ? '📋' : '⚙️'}</span>

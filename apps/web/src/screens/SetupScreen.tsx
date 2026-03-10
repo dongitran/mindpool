@@ -28,7 +28,7 @@ function TypingIndicator() {
         🤖
       </div>
       <div
-        className="px-3.5 py-2.5 rounded-[var(--radius)] flex items-center gap-1"
+        className="px-3.5 py-2.5 rounded flex items-center gap-1"
         style={{ background: 'var(--surface-2)', border: '1px solid var(--border)' }}
       >
         <span
@@ -161,10 +161,10 @@ export function SetupScreen() {
   return (
     <div className="flex-1 flex flex-col overflow-hidden">
       {/* Header */}
-      <div className="px-[22px] py-3.5 border-b border-[var(--border)] flex items-center justify-between flex-shrink-0">
+      <div className="px-[22px] py-3.5 border-b border-border flex items-center justify-between flex-shrink-0">
         <div>
           <div className="text-sm font-semibold">{title}</div>
-          <div className="text-[11px] text-[var(--text-muted)] mt-px">{sub}</div>
+          <div className="text-[11px] text-text-muted mt-px">{sub}</div>
         </div>
         <Tag variant="green">✦ Online</Tag>
       </div>
