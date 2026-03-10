@@ -10,6 +10,8 @@ import { errorHandler } from './middleware/errorHandler';
 import { logger } from './lib/logger';
 import { redis, redisSub, redisWorker } from './lib/redis';
 import { startWorker, stopWorker } from './queue/worker';
+import rateLimit from 'express-rate-limit';
+import { RedisStore } from 'rate-limit-redis';
 
 const app = express();
 
@@ -32,6 +34,39 @@ app.use(
   })
 );
 app.use(express.json({ limit: '1mb' }));
+
+// Rate limiting
+const globalLimiter = rateLimit({
+  windowMs: 60_000,
+  max: 100,
+  standardHeaders: true,
+  legacyHeaders: false,
+  store: new RedisStore({ sendCommand: (...args: string[]) => redis.call(args[0], ...args.slice(1)) as Promise<any> }),
+  message: { error: { message: 'Too many requests, please try again later' } },
+});
+
+const poolCreateLimiter = rateLimit({
+  windowMs: 60_000,
+  max: 5,
+  standardHeaders: true,
+  legacyHeaders: false,
+  store: new RedisStore({ sendCommand: (...args: string[]) => redis.call(args[0], ...args.slice(1)) as Promise<any> }),
+  message: { error: { message: 'Too many pool creation requests' } },
+});
+
+const messageLimiter = rateLimit({
+  windowMs: 60_000,
+  max: 20,
+  standardHeaders: true,
+  legacyHeaders: false,
+  store: new RedisStore({ sendCommand: (...args: string[]) => redis.call(args[0], ...args.slice(1)) as Promise<any> }),
+  message: { error: { message: 'Too many messages, please slow down' } },
+});
+
+app.use('/api', globalLimiter);
+app.use('/api/pool/create', poolCreateLimiter);
+app.use('/api/conversations/:id/message', messageLimiter);
+app.use('/api/pool/:id/message', messageLimiter);
 
 // Routes
 app.use('/api', apiRouter);

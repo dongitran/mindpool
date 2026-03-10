@@ -3,11 +3,16 @@ import { Conversation } from '../models';
 import { llmRouter } from '../services/mindx.service';
 import type { ChatMessage } from '@mindpool/shared';
 import { logger } from '../lib/logger';
+import { validate } from '../middleware/validate';
+import {
+  createConversationSchema,
+  sendConversationMessageSchema,
+} from '../schemas/conversation.schema';
 
 const router = Router();
 
 // POST /conversations — create new conversation
-router.post('/', async (req, res, next) => {
+router.post('/', validate(createConversationSchema), async (req, res, next) => {
   try {
     const { title } = req.body;
     const now = new Date().toLocaleTimeString('vi-VN', {
@@ -60,7 +65,7 @@ router.get('/:id', async (req, res, next) => {
 });
 
 // POST /conversations/:id/message — send user message, get MindX reply
-router.post('/:id/message', async (req, res, next) => {
+router.post('/:id/message', validate(sendConversationMessageSchema), async (req, res, next) => {
   try {
     const conversation = await Conversation.findById(req.params.id);
     if (!conversation) {

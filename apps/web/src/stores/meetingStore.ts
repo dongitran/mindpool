@@ -26,6 +26,7 @@ interface MeetingState {
   updateAgentState: (agentId: string, state: string) => void;
   updateQueue: (queue: { agentId: string; position: number }[]) => void;
   setPoolComplete: (wrapUp: string) => void;
+  setLoading: (isLoading: boolean) => void;
   reset: () => void;
 }
 
@@ -58,6 +59,7 @@ export const useMeetingStore = create<MeetingState>((set) => ({
   updateAgentState: (agentId, state) =>
     set((s) => ({ agentStates: { ...s.agentStates, [agentId]: state } })),
   updateQueue: (queue) => set({ queue }),
+  setLoading: (isLoading) => set({ isLoading }),
   setPoolComplete: (wrapUp) =>
     set((s) => ({
       pool: s.pool ? { ...s.pool, status: 'completed' } : null,

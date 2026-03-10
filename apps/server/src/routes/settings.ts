@@ -1,5 +1,7 @@
 import { Router } from 'express';
-import { Settings } from '../models';
+import { Settings, maskApiKey } from '../models';
+import { validate } from '../middleware/validate';
+import { updateSettingsSchema } from '../schemas/settings.schema';
 
 const router = Router();
 
@@ -12,14 +14,19 @@ router.get('/', async (_req, res, next) => {
       settings = await Settings.create({ userId: 'default' });
     }
 
-    res.json(settings);
+    const obj = settings.toObject();
+    obj.apiKeys = {
+      kimi: maskApiKey(obj.apiKeys?.kimi ?? ''),
+      minimax: maskApiKey(obj.apiKeys?.minimax ?? ''),
+    };
+    res.json(obj);
   } catch (error) {
     next(error);
   }
 });
 
-// PUT /settings — update settings
-router.put('/', async (req, res, next) => {
+// PUT /settings — update settings (validated, whitelisted fields only)
+router.put('/', validate(updateSettingsSchema), async (req, res, next) => {
   try {
     const settings = await Settings.findOneAndUpdate(
       { userId: 'default' },

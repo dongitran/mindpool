@@ -3,18 +3,15 @@ import * as poolService from '../services/pool.service';
 import * as mindxService from '../services/mindx.service';
 import { redis, MEETING_QUEUE_KEY } from '../lib/redis';
 import { logger } from '../lib/logger';
+import { validate } from '../middleware/validate';
+import { createPoolSchema, sendMessageSchema } from '../schemas/pool.schema';
 
 const router = Router();
 
 // POST /pool/create — create pool from topic + agentIds
-router.post('/pool/create', async (req, res, next) => {
+router.post('/pool/create', validate(createPoolSchema), async (req, res, next) => {
   try {
     const { topic, agentIds, conversationId } = req.body;
-
-    if (!topic || !agentIds?.length) {
-      res.status(400).json({ error: { message: 'topic and agentIds are required' } });
-      return;
-    }
 
     const pool = await poolService.createPool(topic, agentIds, conversationId || '');
     const poolId = pool._id.toString();
@@ -44,7 +41,7 @@ router.post('/pool/create', async (req, res, next) => {
 // GET /pool/:id — get pool details
 router.get('/pool/:id', async (req, res, next) => {
   try {
-    const pool = await poolService.getPool(req.params.id);
+    const pool = await poolService.getPool(req.params.id as string);
     if (!pool) {
       res.status(404).json({ error: { message: 'Pool not found' } });
       return;
@@ -66,15 +63,11 @@ router.get('/pools', async (_req, res, next) => {
 });
 
 // POST /pool/:id/message — user sends a message in an active meeting
-router.post('/pool/:id/message', async (req, res, next) => {
+router.post('/pool/:id/message', validate(sendMessageSchema), async (req, res, next) => {
   try {
-    const { content } = req.body;
-    if (!content) {
-      res.status(400).json({ error: { message: 'content is required' } });
-      return;
-    }
+    const content = req.body.content as string;
 
-    const poolId = req.params.id;
+    const poolId = req.params.id as string;
     const pool = await poolService.getPool(poolId);
     if (!pool) {
       res.status(404).json({ error: { message: 'Pool not found' } });

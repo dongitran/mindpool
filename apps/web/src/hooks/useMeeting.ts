@@ -1,10 +1,12 @@
 import { useCallback, useEffect } from 'react';
 import { useMeetingStore } from '../stores/meetingStore';
+import { useAppStore } from '../stores/appStore';
 import { useSSE } from './useSSE';
 import { api } from '../lib/api';
 
 export function useMeeting(poolId: string | null) {
   const store = useMeetingStore();
+  const setError = useAppStore((s) => s.setError);
 
   // Connect SSE
   useSSE(poolId);
@@ -12,9 +14,18 @@ export function useMeeting(poolId: string | null) {
   // Load pool data
   useEffect(() => {
     if (!poolId) return;
-    api.getPool(poolId).then((pool) => {
-      store.setCurrentPool(poolId, pool);
-    });
+    store.setLoading(true);
+    api
+      .getPool(poolId)
+      .then((pool) => {
+        store.setCurrentPool(poolId, pool);
+      })
+      .catch(() => {
+        setError('Không thể tải thông tin meeting');
+      })
+      .finally(() => {
+        store.setLoading(false);
+      });
   }, [poolId]);
 
   const sendMessage = useCallback(
@@ -25,9 +36,13 @@ export function useMeeting(poolId: string | null) {
         content,
         timestamp: new Date().toISOString(),
       });
-      await api.sendPoolMessage(poolId, content);
+      try {
+        await api.sendPoolMessage(poolId, content);
+      } catch {
+        setError('Không thể gửi tin nhắn. Vui lòng thử lại.');
+      }
     },
-    [poolId, store],
+    [poolId, store, setError],
   );
 
   return {

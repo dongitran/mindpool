@@ -10,5 +10,5 @@ export type { MessageDocument } from './Message';
 export { Conversation } from './Conversation';
 export type { ConversationDocument } from './Conversation';
 
-export { Settings } from './Settings';
+export { Settings, maskApiKey } from './Settings';
 export type { SettingsDocument } from './Settings';

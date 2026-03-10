@@ -6,6 +6,7 @@ import { SetupScreen } from './screens/SetupScreen';
 import { MeetingScreen } from './screens/MeetingScreen';
 import { HistoryScreen } from './screens/HistoryScreen';
 import { SettingsScreen } from './screens/SettingsScreen';
+import { ErrorBoundary } from './components/ErrorBoundary';
 import { api } from './lib/api';
 
 function CurrentScreen() {
@@ -27,18 +28,36 @@ function CurrentScreen() {
   }
 }
 
+function ErrorBanner() {
+  const error = useAppStore((s) => s.error);
+  const clearError = useAppStore((s) => s.clearError);
+
+  if (!error) return null;
+
+  return (
+    <div className="flex items-center justify-between px-4 py-2 bg-[var(--red)]/15 border-b border-[var(--red)]/30 text-[var(--red)] text-sm">
+      <span>{error}</span>
+      <button
+        onClick={clearError}
+        className="ml-3 px-2 py-0.5 rounded text-xs hover:bg-[var(--red)]/20 transition-colors"
+      >
+        Dismiss
+      </button>
+    </div>
+  );
+}
+
 export default function App() {
-  const { setConversations, setPools, conversations, pools } = useAppStore();
+  const { setConversations, setPools, setError, conversations, pools } = useAppStore();
 
   useEffect(() => {
-    // Load initial data
     api.getConversations()
       .then((data) => setConversations(Array.isArray(data) ? data : []))
-      .catch(() => { });
+      .catch(() => setError('Không thể tải danh sách conversations'));
     api.getPools()
       .then((data) => setPools(Array.isArray(data) ? data : []))
-      .catch(() => { });
-  }, [setConversations, setPools]);
+      .catch(() => setError('Không thể tải danh sách pools'));
+  }, [setConversations, setPools, setError]);
 
   return (
     <div className="flex w-full h-screen overflow-hidden bg-[var(--bg)] text-[var(--text)]">
@@ -59,7 +78,10 @@ export default function App() {
         }))}
       />
       <main className="flex-1 min-w-0 flex flex-col overflow-hidden">
-        <CurrentScreen />
+        <ErrorBanner />
+        <ErrorBoundary>
+          <CurrentScreen />
+        </ErrorBoundary>
       </main>
     </div>
   );

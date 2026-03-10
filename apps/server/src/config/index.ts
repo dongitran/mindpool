@@ -9,6 +9,7 @@ export const config = {
   kimiApiKey: process.env.KIMI_API_KEY ?? '',
   minimaxApiKey: process.env.MINIMAX_API_KEY ?? '',
   host: process.env.MINDPOOL_HOST ?? '',
+  encryptionKey: process.env.ENCRYPTION_KEY ?? '',
   llmRouting: {
     fullResponse: {
       provider: process.env.LLM_FULL_RESPONSE_PROVIDER ?? '',

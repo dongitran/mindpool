@@ -10,6 +10,7 @@ interface AppState {
   currentMeetingId: string | null;
   conversations: Conversation[];
   pools: Pool[];
+  error: string | null;
 
   setScreen: (screen: Screen) => void;
   setCurrentConversation: (id: string | null) => void;
@@ -18,6 +19,8 @@ interface AppState {
   setPools: (pools: Pool[]) => void;
   navigateToMeeting: (meetingId: string) => void;
   navigateToSetup: (conversationId?: string) => void;
+  setError: (error: string | null) => void;
+  clearError: () => void;
 }
 
 export const useAppStore = create<AppState>((set) => ({
@@ -26,6 +29,7 @@ export const useAppStore = create<AppState>((set) => ({
   currentMeetingId: null,
   conversations: [],
   pools: [],
+  error: null,
 
   setScreen: (screen) => set({ currentScreen: screen }),
   setCurrentConversation: (id) => set({ currentConversationId: id }),
@@ -36,4 +40,6 @@ export const useAppStore = create<AppState>((set) => ({
     set({ currentScreen: 'meeting', currentMeetingId: meetingId }),
   navigateToSetup: (conversationId) =>
     set({ currentScreen: 'setup', currentConversationId: conversationId || null }),
+  setError: (error) => set({ error }),
+  clearError: () => set({ error: null }),
 }));
