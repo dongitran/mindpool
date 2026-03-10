@@ -1,6 +1,8 @@
 {
   "version": "0.2",
-  "import": ["@cspell/dict-vi-vn/cspell-ext.json"],
+  "import": [
+    "@cspell/dict-vi-vn/cspell-ext.json"
+  ],
   "language": "en,vi",
   "ignorePaths": [
     "pnpm-lock.yaml",
@@ -75,6 +77,16 @@
     "blpop",
     "RPUSH",
     "BLPOP",
-    "pubsub"
+    "pubsub",
+    "lpop",
+    "LPOP",
+    "lrange",
+    "LRANGE",
+    "llen",
+    "LLEN",
+    "hgetall",
+    "HGETALL",
+    "hset",
+    "HSET"
   ]
 }
