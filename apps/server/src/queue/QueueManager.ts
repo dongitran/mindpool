@@ -10,15 +10,36 @@ export class QueueManager {
   }
 
   async addToQueue(agentId: string): Promise<boolean> {
-    const isFull = await this.isFull();
-    if (isFull) return false;
+    // Atomic check-and-push using Lua
+    // ARGV[1] = agentId, ARGV[2] = maxDepth, ARGV[3] = TTL
+    const luaScript = `
+      local qLen = redis.call('LLEN', KEYS[1])
+      if qLen >= tonumber(ARGV[2]) then
+        return 0
+      end
+      
+      local items = redis.call('LRANGE', KEYS[1], 0, -1)
+      for i=1, #items do
+        if items[i] == ARGV[1] then
+          return 0
+        end
+      end
+      
+      redis.call('RPUSH', KEYS[1], ARGV[1])
+      redis.call('EXPIRE', KEYS[1], ARGV[3])
+      return 1
+    `;
 
-    const inQueue = await this.isInQueue(agentId);
-    if (inQueue) return false;
+    const result = await redis.eval(
+      luaScript,
+      1,
+      this.key,
+      agentId,
+      this.maxDepth.toString(),
+      POOL_LOCK_TTL_SEC.toString()
+    );
 
-    await redis.rpush(this.key, agentId);
-    await redis.expire(this.key, POOL_LOCK_TTL_SEC); // auto-cleanup after 5 mins of inactivity
-    return true;
+    return result === 1;
   }
 
   async popFromQueue(): Promise<string | null> {

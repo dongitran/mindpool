@@ -27,6 +27,22 @@ vi.mock('../../lib/redis', () => {
         lists.delete(key);
       }),
       expire: vi.fn(async () => { }),
+      eval: vi.fn(async (script: string, numKeys: number, key: string, arg1: string, arg2: string, _arg3: string) => {
+        // Lua script mock implementation
+        // arg1 = agentId, arg2 = maxDepth, arg3 = TTL
+        if (!lists.has(key)) lists.set(key, []);
+        const list = lists.get(key)!;
+
+        // 1. Check max depth
+        if (list.length >= parseInt(arg2)) return 0;
+
+        // 2. Check duplicates
+        if (list.includes(arg1)) return 0;
+
+        // 3. Push and set expire (mocked)
+        list.push(arg1);
+        return 1;
+      }),
     },
     POOL_LOCK_TTL_SEC: 300,
   };
@@ -60,6 +76,23 @@ describe('QueueManager', () => {
       await queue.addToQueue('agent-4');
       expect(await queue.addToQueue('agent-5')).toBe(false);
       expect(await queue.getSize()).toBe(4);
+    });
+
+    it('QC Test: should expose time of check to time of use race condition with concurrent additions', async () => {
+      // Clear the queue first
+      await queue.clear();
+      // Try to add 10 agents concurrently
+      const agents = Array.from({ length: 10 }, (_, i) => `agent-race-${i}`);
+      const results = await Promise.all(agents.map(a => queue.addToQueue(a)));
+
+      const successCount = results.filter(Boolean).length;
+      const finalSize = await queue.getSize();
+
+      // If there's a race condition, it might add more than 4 agents
+      // Let's assert what *should* happen (it should cap at 4, but due to bug it might be 10)
+      console.log(`Concurrent results: ${successCount} succeeded. Final queue size: ${finalSize}`);
+      // NOTE: We intentionally expect this to fail initially if the code has a race.
+      expect(finalSize).toBeLessThanOrEqual(4);
     });
   });
 

@@ -26,7 +26,10 @@ router.post('/pool/create', validate(createPoolSchema), async (req, res, next) =
       specialty: a.role || '',
     }));
     const openingAgent = await mindxService.selectOpeningAgent(topic, agents);
-    mindxService.getQueueManager(poolId).addToQueue(openingAgent.agentId);
+    if (openingAgent) {
+      // Await the queue operation to fix unhandled floating promise
+      await mindxService.getQueueManager(poolId).addToQueue(openingAgent.agentId);
+    }
 
     // Enqueue meeting loop job — worker picks it up via BLPOP
     await redis.rpush(MEETING_QUEUE_KEY, JSON.stringify({ poolId }));
@@ -78,7 +81,7 @@ router.post('/pool/:id/message', validate(sendMessageSchema), async (req, res, n
     const message = await poolService.addMessage(poolId, { agentId: 'user', content });
 
     // Update stop detector with user message (same process — in-memory is fine)
-    mindxService.getStopDetector(poolId).checkUserTrigger(content);
+    await mindxService.getStopDetector(poolId).checkUserTrigger(content);
 
     // Enqueue next meeting loop round
     await redis.rpush(MEETING_QUEUE_KEY, JSON.stringify({ poolId }));

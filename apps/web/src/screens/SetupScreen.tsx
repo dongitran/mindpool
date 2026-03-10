@@ -6,6 +6,7 @@ import { Tag } from '../components/ui/Tag';
 import { api } from '../lib/api';
 
 interface ConvMessage {
+  id?: string;
   type: 'bot' | 'user' | 'bot-agents' | 'bot-created';
   time: string;
   content?: string;
@@ -55,6 +56,7 @@ const makeTime = () =>
   new Date().toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true });
 
 const GREETING: ConvMessage = {
+  id: crypto.randomUUID(),
   type: 'bot',
   time: makeTime(),
   content:
@@ -86,7 +88,7 @@ export function SetupScreen() {
       .getConversation(currentConversationId)
       .then((conv) => {
         if (conv.messages?.length) {
-          setMessages(conv.messages as ConvMessage[]);
+          setMessages((conv.messages as ConvMessage[]).map(m => ({ ...m, id: m.id || crypto.randomUUID() })));
         }
       })
       .catch(() => {
@@ -102,7 +104,7 @@ export function SetupScreen() {
   }, [messages, isTyping]);
 
   const handleSend = async (content: string) => {
-    const userMsg: ConvMessage = { type: 'user', time: makeTime(), content };
+    const userMsg: ConvMessage = { id: crypto.randomUUID(), type: 'user', time: makeTime(), content };
     setMessages((prev) => [...prev, userMsg]);
     setIsTyping(true);
 
@@ -124,12 +126,14 @@ export function SetupScreen() {
       };
 
       if (result.message) {
-        setMessages((prev) => [...prev, result.message as ConvMessage]);
+        const botMsg = result.message as ConvMessage;
+        setMessages((prev) => [...prev, { ...botMsg, id: botMsg.id || crypto.randomUUID() }]);
       }
     } catch {
       setMessages((prev) => [
         ...prev,
         {
+          id: crypto.randomUUID(),
           type: 'bot',
           time: makeTime(),
           content: '⚠️ Xin lỗi, tôi gặp lỗi khi xử lý. Bạn thử lại nhé!',
@@ -171,16 +175,19 @@ export function SetupScreen() {
 
       {/* Messages */}
       <div ref={msgsRef} className="flex-1 overflow-y-auto py-[22px] scrollbar-thin">
-        {messages.map((msg, i) => (
-          <MessageBubble
-            key={i}
-            message={msg}
-            onStartMeeting={handleStartMeeting}
-            onGoToMeeting={(id) => navigateToMeeting(id)}
-            onToggleAgent={handleToggleAgent}
-            meetingCreated={msg.meetingId ? createdMeetings.has(msg.meetingId) : false}
-          />
-        ))}
+        {messages.map((msg, i) => {
+          const msgKey = msg.id || `${msg.time}-${msg.type}-${i}`;
+          return (
+            <MessageBubble
+              key={msgKey}
+              message={msg}
+              onStartMeeting={handleStartMeeting}
+              onGoToMeeting={(id) => navigateToMeeting(id)}
+              onToggleAgent={handleToggleAgent}
+              meetingCreated={msg.meetingId ? createdMeetings.has(msg.meetingId) : false}
+            />
+          );
+        })}
         {isTyping && <TypingIndicator />}
       </div>
 

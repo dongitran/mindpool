@@ -107,9 +107,9 @@ export function MessageBubble({
               🧠 {message.meetingTitle}
             </div>
             <div className="flex gap-[5px] flex-wrap mb-2.5">
-              {message.agentBadges?.map((badge, i) => (
+              {message.agentBadges?.map((badge) => (
                 <span
-                  key={i}
+                  key={badge}
                   className="px-2.5 py-0.5 bg-surface-2 border border-border-light rounded-full text-[10.5px] text-text-muted flex items-center gap-1"
                 >
                   {badge}

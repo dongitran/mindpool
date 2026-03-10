@@ -2,6 +2,7 @@ import { create } from 'zustand';
 import type { Pool } from '@mindpool/shared';
 
 interface MeetingMessage {
+  id?: string;
   type: 'agent' | 'user' | 'mindx' | 'typing';
   agentId?: string;
   agentName?: string;
@@ -47,14 +48,15 @@ export const useMeetingStore = create<MeetingState>((set) => ({
     }),
   addMessage: (message) =>
     set((s) => {
+      const msgWithId = { ...message, id: message.id || crypto.randomUUID() };
       // When an actual agent message arrives, remove the typing indicator for that agent
-      if (message.type === 'agent' && message.agentId) {
+      if (msgWithId.type === 'agent' && msgWithId.agentId) {
         const filtered = s.messages.filter(
-          (m) => !(m.type === 'typing' && m.agentId === message.agentId)
+          (m) => !(m.type === 'typing' && m.agentId === msgWithId.agentId)
         );
-        return { messages: [...filtered, message] };
+        return { messages: [...filtered, msgWithId] };
       }
-      return { messages: [...s.messages, message] };
+      return { messages: [...s.messages, msgWithId] };
     }),
   updateAgentState: (agentId, state) =>
     set((s) => ({ agentStates: { ...s.agentStates, [agentId]: state } })),
