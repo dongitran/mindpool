@@ -26,7 +26,7 @@ export function useMeeting(poolId: string | null) {
       .finally(() => {
         store.setLoading(false);
       });
-  }, [poolId]);
+  }, [poolId, store, setError]);
 
   const sendMessage = useCallback(
     async (content: string) => {

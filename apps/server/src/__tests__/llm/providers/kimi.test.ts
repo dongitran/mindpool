@@ -28,7 +28,7 @@ describe('KimiProvider', () => {
 
     expect(result).toBe('Hello from Kimi');
     expect(global.fetch).toHaveBeenCalledWith(
-      'https://api.moonshot.cn/v1/chat/completions',
+      'https://api.kimi.com/coding/v1/chat/completions',
       expect.objectContaining({
         method: 'POST',
         headers: expect.objectContaining({
