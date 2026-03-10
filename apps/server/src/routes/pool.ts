@@ -16,26 +16,37 @@ router.post('/pool/create', validate(createPoolSchema), async (req, res, next) =
     const pool = await poolService.createPool(topic, agentIds, conversationId || '');
     const poolId = pool._id.toString();
 
-    // Generate opening announcement (sync — needed before loop starts)
-    await mindxService.generateAnnouncement(poolId);
+    try {
+      // Generate opening announcement (sync — needed before loop starts)
+      await mindxService.generateAnnouncement(poolId);
 
-    // Select opening agent and seed the in-memory queue
-    const agents = pool.agents.map((a: { agentId: string; name: string; role?: string }) => ({
-      agentId: a.agentId,
-      name: a.name,
-      specialty: a.role || '',
-    }));
-    const openingAgent = await mindxService.selectOpeningAgent(topic, agents);
-    if (openingAgent) {
-      // Await the queue operation to fix unhandled floating promise
-      await mindxService.getQueueManager(poolId).addToQueue(openingAgent.agentId);
+      // Select opening agent and seed the in-memory queue
+      const agents = pool.agents.map((a: { agentId: string; name: string; role?: string }) => ({
+        agentId: a.agentId,
+        name: a.name,
+        specialty: a.role || '',
+      }));
+      const openingAgent = await mindxService.selectOpeningAgent(topic, agents);
+      if (openingAgent) {
+        // Await the queue operation to fix unhandled floating promise
+        await mindxService.getQueueManager(poolId).addToQueue(openingAgent.agentId);
+      }
+
+      // Enqueue meeting loop job — worker picks it up via BLPOP
+      await redis.rpush(MEETING_QUEUE_KEY, JSON.stringify({ poolId }));
+      logger.info('Meeting loop enqueued', { poolId });
+
+      res.status(201).json(pool);
+    } catch (innerError) {
+      logger.error('Failed to initialize pool post-creation. Rolling back MongoDB...', { poolId, error: innerError });
+      try {
+        const { Pool } = await import('../models/Pool.js');
+        await Pool.findByIdAndDelete(poolId);
+      } catch (rollbackError) {
+        logger.error('CRITICAL: Rollback failed. Zombie pool exists in DB.', { poolId, error: rollbackError });
+      }
+      throw innerError;
     }
-
-    // Enqueue meeting loop job — worker picks it up via BLPOP
-    await redis.rpush(MEETING_QUEUE_KEY, JSON.stringify({ poolId }));
-    logger.info('Meeting loop enqueued', { poolId });
-
-    res.status(201).json(pool);
   } catch (error) {
     next(error);
   }

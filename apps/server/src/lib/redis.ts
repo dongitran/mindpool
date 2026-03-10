@@ -20,4 +20,4 @@ export const redisSub = createClient('sub');
 export const redisWorker = createClient('worker');
 
 export const MEETING_QUEUE_KEY = 'queue:meeting-loop';
-export const POOL_LOCK_TTL_SEC = 300; // 5 min max per loop run
+export const POOL_LOCK_TTL_SEC = 900; // 15 phút (900s) - Đảm bảo lớn hơn Timeout dài nhất của LLM để tránh Zombie Lock
