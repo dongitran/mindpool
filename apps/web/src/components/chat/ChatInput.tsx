@@ -1,4 +1,4 @@
-import { useRef, KeyboardEvent } from 'react';
+import { useState, KeyboardEvent, useEffect, useRef } from 'react';
 
 interface ChatInputProps {
   placeholder?: string;
@@ -11,15 +11,24 @@ export function ChatInput({
   onSend,
   disabled = false,
 }: ChatInputProps) {
-  const ref = useRef<HTMLTextAreaElement>(null);
+  const [message, setMessage] = useState('');
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
+
+  useEffect(() => {
+    if (textareaRef.current) {
+      textareaRef.current.style.height = 'auto';
+      textareaRef.current.style.height = `${Math.min(textareaRef.current.scrollHeight, 120)}px`;
+    }
+  }, [message]);
 
   const handleSend = () => {
-    if (!ref.current) return;
-    const val = ref.current.value.trim();
+    const val = message.trim();
     if (!val) return;
     onSend(val);
-    ref.current.value = '';
-    ref.current.style.height = 'auto';
+    setMessage('');
+    if (textareaRef.current) {
+      textareaRef.current.style.height = 'auto';
+    }
   };
 
   const handleKeyDown = (e: KeyboardEvent) => {
@@ -33,16 +42,13 @@ export function ChatInput({
     <div className="px-[22px] py-[14px] pb-[18px] border-t border-border flex-shrink-0">
       <div className="flex items-end gap-2.5 px-3.5 py-2.5 bg-surface-2 border border-border-light rounded transition-colors focus-within:border-[rgba(61,255,192,0.4)]">
         <textarea
-          ref={ref}
+          ref={textareaRef}
+          value={message}
+          onChange={(e) => setMessage(e.target.value)}
           className="flex-1 bg-transparent border-none outline-none text-text font-[Sora] text-[13.5px] resize-none leading-relaxed max-h-[120px] overflow-y-auto placeholder:text-text-muted"
           placeholder={placeholder}
           rows={1}
           disabled={disabled}
-          onInput={(e) => {
-            const t = e.currentTarget;
-            t.style.height = 'auto';
-            t.style.height = t.scrollHeight + 'px';
-          }}
           onKeyDown={handleKeyDown}
         />
         <button

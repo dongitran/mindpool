@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import { useAppStore } from '../stores/appStore';
 import { MessageBubble } from '../components/chat/MessageBubble';
 import { ChatInput } from '../components/chat/ChatInput';
+import { TypingIndicator } from '../components/chat/TypingIndicator';
 import { Tag } from '../components/ui/Tag';
 import { api } from '../lib/api';
 
@@ -19,38 +20,19 @@ interface ConvMessage {
 }
 
 /** Animated "MindX is typing..." indicator */
-function TypingIndicator() {
+function SetupTypingIndicator() {
   return (
-    <div className="px-[22px] py-2 flex items-center gap-2.5">
-      <div
-        className="w-7 h-7 rounded-full flex-shrink-0 flex items-center justify-center text-sm"
-        style={{ background: 'var(--surface-2)', border: '1px solid var(--border)' }}
-      >
-        🤖
+    <div className="flex gap-3 px-[22px] py-1 mb-1 animate-msg-in">
+      <div className="w-7 h-7 rounded-full flex-shrink-0 flex items-center justify-center text-[13px] mt-0.5 bg-gradient-to-br from-accent to-purple">
+        🧠
       </div>
-      <div
-        className="px-3.5 py-2.5 rounded flex items-center gap-1"
-        style={{ background: 'var(--surface-2)', border: '1px solid var(--border)' }}
-      >
-        <span
-          className="w-1.5 h-1.5 rounded-full"
-          style={{ background: 'var(--text-muted)', animation: 'typingDot 1.2s ease-in-out infinite', animationDelay: '0s' }}
-        />
-        <span
-          className="w-1.5 h-1.5 rounded-full"
-          style={{ background: 'var(--text-muted)', animation: 'typingDot 1.2s ease-in-out infinite', animationDelay: '0.2s' }}
-        />
-        <span
-          className="w-1.5 h-1.5 rounded-full"
-          style={{ background: 'var(--text-muted)', animation: 'typingDot 1.2s ease-in-out infinite', animationDelay: '0.4s' }}
-        />
-        <span className="text-[11px] ml-1.5" style={{ color: 'var(--text-muted)' }}>
-          MindX đang suy nghĩ...
-        </span>
+      <div className="max-w-[520px]">
+        <TypingIndicator />
       </div>
     </div>
   );
 }
+
 
 const makeTime = () =>
   new Date().toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true });
@@ -64,7 +46,8 @@ const GREETING: ConvMessage = {
 };
 
 export function SetupScreen() {
-  const { currentConversationId, setCurrentConversation, navigateToMeeting } = useAppStore();
+  const { currentConversationId, setCurrentConversation, navigateToMeeting, initialSetupTopic, setInitialSetupTopic } =
+    useAppStore();
   const [messages, setMessages] = useState<ConvMessage[]>([GREETING]);
   const [title] = useState('MindX');
   const [sub] = useState('Mô tả chủ đề — AI sẽ gợi ý agents phù hợp');
@@ -120,16 +103,23 @@ export function SetupScreen() {
         setCurrentConversation(convId);
       }
 
-      // ── Step 2: send message — backend returns { message: botMessage } ────
-      const result = await api.sendConversationMessage(convId, content) as {
-        message?: ConvMessage;
-      };
+      // ── Step 2: send message — backend returns the updated Conversation ────
+      const updatedConv = await api.sendConversationMessage(convId, content);
+      console.log('DEBUG: API Response updatedConv:', updatedConv);
 
-      if (result.message) {
-        const botMsg = result.message as ConvMessage;
-        setMessages((prev) => [...prev, { ...botMsg, id: botMsg.id || crypto.randomUUID() }]);
+      if (updatedConv.messages?.length) {
+        console.log('DEBUG: setMessages will run with length:', updatedConv.messages.length);
+        // Replace entire local message array with whatever the backend knows, 
+        // to stay perfectly in sync. Ensure all have string IDs.
+        setMessages((updatedConv.messages as ConvMessage[]).map(m => ({
+          ...m,
+          id: m.id || crypto.randomUUID()
+        })));
+      } else {
+        console.log('DEBUG: No .messages array found on updatedConv', Object.keys(updatedConv));
       }
-    } catch {
+    } catch (err) {
+      console.error('DEBUG: catch error in handleSend', err);
       setMessages((prev) => [
         ...prev,
         {
@@ -162,6 +152,13 @@ export function SetupScreen() {
     );
   };
 
+  useEffect(() => {
+    if (initialSetupTopic && messages.length === 1) {
+      handleSend(initialSetupTopic);
+      setInitialSetupTopic(null);
+    }
+  }, [initialSetupTopic, messages.length]);
+
   return (
     <div className="flex-1 flex flex-col overflow-hidden">
       {/* Header */}
@@ -188,7 +185,7 @@ export function SetupScreen() {
             />
           );
         })}
-        {isTyping && <TypingIndicator />}
+        {isTyping && <SetupTypingIndicator />}
       </div>
 
       {/* Input */}

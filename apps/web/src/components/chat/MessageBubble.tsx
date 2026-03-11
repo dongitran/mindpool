@@ -1,4 +1,5 @@
-import { sanitizeHTML } from '../../lib/sanitize';
+import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
 import { AgentSuggestion } from './AgentSuggestion';
 
 interface MessageProps {
@@ -28,9 +29,9 @@ export function MessageBubble({
 }: MessageProps) {
   if (message.type === 'user') {
     return (
-      <div className="flex justify-end px-[22px] py-1 animate-msg-in">
+      <div className="flex justify-end px-[22px] py-1 mb-1 animate-msg-in">
         <div className="max-w-[520px]">
-          <div className="px-4 py-[11px] rounded-[14px] rounded-tr bg-accent-dim border border-[rgba(61,255,192,0.2)] text-text text-[13.5px] leading-relaxed">
+          <div className="px-[15px] py-[11px] rounded-[14px] rounded-tr bg-accent-dim border border-[rgba(61,255,192,0.2)] text-text text-[13.5px] leading-[1.65]">
             {message.content}
           </div>
           <div className="text-[10px] text-text-dim mt-1 px-1 text-right">
@@ -46,15 +47,16 @@ export function MessageBubble({
 
   if (message.type === 'bot') {
     return (
-      <div className="flex gap-3 px-[22px] py-1 animate-msg-in">
+      <div className="flex gap-3 px-[22px] py-1 mb-1 animate-msg-in">
         <div className="w-7 h-7 rounded-full flex-shrink-0 flex items-center justify-center text-[13px] mt-0.5 bg-gradient-to-br from-accent to-purple">
           🧠
         </div>
         <div className="max-w-[520px]">
-          <div
-            className="px-4 py-[11px] rounded-[14px] rounded-tl bg-surface-2 border border-border text-text text-[13.5px] leading-relaxed"
-            dangerouslySetInnerHTML={{ __html: sanitizeHTML(message.content || '') }}
-          />
+          <div className="px-[15px] py-[11px] rounded-[14px] rounded-tl bg-surface-2 border border-border text-text text-[13.5px] leading-[1.65] prose prose-invert max-w-none prose-p:leading-relaxed prose-pre:bg-surface-3 prose-pre:border prose-pre:border-border-light prose-sm">
+            <ReactMarkdown remarkPlugins={[remarkGfm]}>
+              {message.content || ''}
+            </ReactMarkdown>
+          </div>
           <div className="text-[10px] text-text-dim mt-1 px-1">
             {message.time}
           </div>
@@ -65,13 +67,15 @@ export function MessageBubble({
 
   if (message.type === 'bot-agents') {
     return (
-      <div className="flex gap-3 px-[22px] py-1 animate-msg-in">
+      <div className="flex gap-3 px-[22px] py-1 mb-1 animate-msg-in">
         <div className="w-7 h-7 rounded-full flex-shrink-0 flex items-center justify-center text-[13px] mt-0.5 bg-gradient-to-br from-accent to-purple">
           🧠
         </div>
         <div className="max-w-[520px]">
-          <div className="px-4 py-[11px] rounded-[14px] rounded-tl bg-surface-2 border border-border text-text text-[13.5px] leading-relaxed">
-            <span dangerouslySetInnerHTML={{ __html: sanitizeHTML(message.intro || '') }} />
+          <div className="px-[15px] py-[11px] rounded-[14px] rounded-tl bg-surface-2 border border-border text-text text-[13.5px] leading-[1.65] prose prose-invert max-w-none prose-p:leading-relaxed prose-pre:bg-surface-3 prose-pre:border prose-pre:border-border-light prose-sm">
+            <ReactMarkdown remarkPlugins={[remarkGfm]}>
+              {message.intro || ''}
+            </ReactMarkdown>
             <AgentSuggestion
               agents={message.agents || []}
               meetingId={message.meetingId || ''}

@@ -20,7 +20,7 @@ export const api = {
   getConversation: (id: string) =>
     request<Conversation>(`/conversations/${id}`),
   sendConversationMessage: (id: string, content: string) =>
-    request<{ message: Conversation['messages'][number] }>(`/conversations/${id}/message`, {
+    request<Conversation>(`/conversations/${id}/message`, {
       method: 'POST',
       body: JSON.stringify({ content }),
     }),

@@ -15,7 +15,7 @@ const TOPIC_PILLS = [
 ];
 
 export function WelcomeScreen() {
-  const { navigateToSetup } = useAppStore();
+  const { navigateToSetup, setInitialSetupTopic } = useAppStore();
 
   return (
     <div className="flex-1 flex flex-col items-center justify-center p-10 relative overflow-y-auto w-full h-full">
@@ -58,7 +58,10 @@ export function WelcomeScreen() {
           {TOPIC_PILLS.map((pill) => (
             <div
               key={pill.label}
-              onClick={() => navigateToSetup()}
+              onClick={() => {
+                setInitialSetupTopic(pill.label);
+                navigateToSetup();
+              }}
               className="px-3.5 py-2 bg-surface-2 border border-border-light rounded-sm text-[12px] text-text-muted cursor-pointer transition-all duration-200 flex items-center gap-2 hover:border-accent hover:text-accent hover:-translate-y-[1px]"
             >
               {pill.icon} {pill.label}

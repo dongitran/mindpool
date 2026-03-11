@@ -26,15 +26,15 @@ export function AgentSuggestion({
       {agents.map((agent, i) => (
         <div
           key={i}
-          className={`flex items-center gap-2.5 p-2 px-[11px] rounded-sm border transition-all ${
+          onClick={() => onToggle(i)}
+          className={`flex items-center gap-2.5 p-2 px-[11px] rounded-sm border transition-all cursor-pointer hover:border-[rgba(61,255,192,0.4)] ${
             agent.checked
               ? 'bg-accent-dim border-[rgba(61,255,192,0.3)]'
               : 'bg-surface-3 border-border-light'
           }`}
         >
           <div
-            onClick={() => onToggle(i)}
-            className={`w-[17px] h-[17px] rounded-[5px] border-[1.5px] flex items-center justify-center text-[9px] flex-shrink-0 cursor-pointer transition-all ${
+            className={`w-[17px] h-[17px] rounded-[5px] border-[1.5px] flex items-center justify-center text-[9px] flex-shrink-0 transition-all ${
               agent.checked
                 ? 'bg-accent border-accent text-bg'
                 : 'border-border-light'
