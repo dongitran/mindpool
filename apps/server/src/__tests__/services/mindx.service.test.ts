@@ -120,6 +120,7 @@ import {
   selectOpeningAgent,
   generateAnnouncement,
   runRelevanceCheck,
+  generateConversationTitle,
   handleMeetingLoop,
 } from '../../services/mindx.service';
 import { Pool, Agent, Message } from '../../models';
@@ -292,6 +293,70 @@ describe('runRelevanceCheck', () => {
 
     const result = await runRelevanceCheck('agent-1', 'business', 'message', 'context');
     expect(result).toBe(false);
+  });
+});
+
+describe('generateConversationTitle', () => {
+  beforeEach(() => vi.clearAllMocks());
+
+  it('should return English title from full exchange', async () => {
+    mockChat.mockResolvedValue('B2B Marketing Strategy');
+    const result = await generateConversationTitle(
+      'Analyze B2B marketing for startups',
+      'Great topic! B2B marketing involves...'
+    );
+    expect(result).toBe('B2B Marketing Strategy');
+  });
+
+  it('should return null when AI returns NONE', async () => {
+    mockChat.mockResolvedValue('NONE');
+    const result = await generateConversationTitle('Hello', 'What topic?');
+    expect(result).toBeNull();
+  });
+
+  it('should return null for case-insensitive NONE variants', async () => {
+    mockChat.mockResolvedValue('none');
+    expect(await generateConversationTitle('Hi', 'response')).toBeNull();
+
+    mockChat.mockResolvedValue('  NONE  ');
+    expect(await generateConversationTitle('Hi', 'response')).toBeNull();
+  });
+
+  it('should return null when LLM returns empty string', async () => {
+    mockChat.mockResolvedValue('');
+    const result = await generateConversationTitle('Hello', 'response');
+    expect(result).toBeNull();
+  });
+
+  it('should strip surrounding quotes from title', async () => {
+    mockChat.mockResolvedValue('"AI Strategy Discussion"');
+    const result = await generateConversationTitle('AI strategy', 'response');
+    expect(result).toBe('AI Strategy Discussion');
+  });
+
+  it('should return null when LLM throws (timeout or error)', async () => {
+    mockChat.mockRejectedValue(new Error('timeout'));
+    const result = await generateConversationTitle('topic', 'response');
+    expect(result).toBeNull();
+  });
+
+  it('should work with user message only (no botReply)', async () => {
+    mockChat.mockResolvedValue('AI Startup Strategy');
+    const result = await generateConversationTitle('AI startup strategy analysis');
+    expect(result).toBe('AI Startup Strategy');
+    const callArg = mockChat.mock.calls[0][0];
+    const userMsg = callArg.find((m: { role: string }) => m.role === 'user');
+    expect(userMsg.content).not.toContain('Assistant:');
+  });
+
+  it('should truncate long botReply to 300 chars in context', async () => {
+    mockChat.mockResolvedValue('Long Topic Title');
+    const longReply = 'x'.repeat(500);
+    await generateConversationTitle('topic', longReply);
+    const callArg = mockChat.mock.calls[0][0];
+    const userMsg = callArg.find((m: { role: string }) => m.role === 'user');
+    expect(userMsg.content).toContain('x'.repeat(300));
+    expect(userMsg.content).not.toContain('x'.repeat(301));
   });
 });
 

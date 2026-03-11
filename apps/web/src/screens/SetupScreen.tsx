@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 import { useAppStore } from '../stores/appStore';
 import type { ConversationMessage } from '@mindpool/shared';
 import { MessageBubble } from '../components/chat/MessageBubble';
@@ -53,6 +54,7 @@ export function SetupScreen() {
   const msgsRef = useRef<HTMLDivElement>(null);
   // Skip fetching conversation when we've just locally created it in handleSend
   const skipNextFetch = useRef(false);
+  const queryClient = useQueryClient();
 
   // Load existing conversation on mount (if navigated back to an existing conversation)
   useEffect(() => {
@@ -115,6 +117,8 @@ export function SetupScreen() {
       // Keep track of our local user message ID to prevent flicker
       const lastUserMsgId = userMsg.id;
       const updatedConv = await api.sendConversationMessage(convId, content);
+      // Invalidate conversations list cache → Sidebar refetches and shows new title
+      queryClient.invalidateQueries({ queryKey: ['conversations'] });
       console.log('DEBUG: API Response updatedConv:', updatedConv);
 
       if (updatedConv.messages?.length) {

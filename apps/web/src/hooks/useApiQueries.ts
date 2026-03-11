@@ -10,6 +10,13 @@ export function useConversations() {
             return Array.isArray(data) ? (data as Conversation[]) : [];
         },
         staleTime: 1000 * 60 * 5, // 5 minutes
+        refetchInterval: (query) => {
+            const data = query.state.data;
+            if (Array.isArray(data) && data.some((c) => c.title === 'Cuộc trò chuyện mới')) {
+                return 5000;
+            }
+            return false;
+        },
     });
 }
 

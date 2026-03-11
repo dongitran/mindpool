@@ -1,4 +1,4 @@
-import type { RouterConfig } from '@mindpool/shared';
+import type { RouterConfig, ChatMessage } from '@mindpool/shared';
 import { LLMRouter } from '../llm/router';
 import { KimiProvider, MinimaxProvider } from '../llm/providers';
 import { QueueManager } from '../queue/QueueManager';
@@ -166,6 +166,42 @@ export async function generateWrapUp(poolId: string): Promise<string> {
     await poolService.updatePoolStatus(poolId, 'completed');
     await broadcastService.broadcastPoolComplete(poolId, fallback);
     return fallback;
+  }
+}
+
+export async function generateConversationTitle(
+  userMessage: string,
+  botReply?: string
+): Promise<string | null> {
+  try {
+    const context = botReply
+      ? `User: ${userMessage}\nAssistant: ${botReply.slice(0, 300)}`
+      : `User: ${userMessage}`;
+
+    const messages: ChatMessage[] = [
+      {
+        role: 'system',
+        content:
+          'Generate a concise English title (3-6 words) for this conversation based on the context. ' +
+          'If the conversation does not have enough meaningful context to generate a specific title, respond with exactly "NONE". ' +
+          'Return only the title or "NONE", no quotes, no explanation.',
+      },
+      { role: 'user', content: context },
+    ];
+
+    const result = await withTimeout(
+      llmRouter.agentChat('full_response', messages, { maxTokens: 1000, temperature: 0.3 }),
+      30_000,
+      'generateConversationTitle'
+    );
+
+    const raw = (typeof result === 'string' ? result : '').trim();
+    if (!raw || raw.toUpperCase() === 'NONE') return null;
+
+    return raw.replace(/^["']|["']$/g, '').trim() || null;
+  } catch (error) {
+    logger.error('Title generation failed, will retry next exchange', { error: error instanceof Error ? error.message : String(error) });
+    return null;
   }
 }
 

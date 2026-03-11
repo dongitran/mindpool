@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import { Conversation } from '../models';
-import { llmRouter, analyzeTopicAndSuggestAgents } from '../services/mindx.service';
+import { llmRouter, analyzeTopicAndSuggestAgents, generateConversationTitle } from '../services/mindx.service';
 import type { ChatMessage } from '@mindpool/shared';
 import { logger } from '../lib/logger';
 import { validate } from '../middleware/validate';
@@ -73,11 +73,17 @@ router.post('/:id/message', validate(sendConversationMessageSchema), async (req,
       return;
     }
 
+    // Try to generate title if still using default — retries every exchange until context is sufficient
+    const needsTitle = conversation.title === 'Cuộc trò chuyện mới';
+
     const { content } = req.body;
     const now = new Date().toLocaleTimeString('vi-VN', {
       hour: '2-digit',
       minute: '2-digit',
     });
+
+    // Hoist replyContent outside inner try/catch so it's accessible for title generation
+    let replyContent = '';
 
     // Add user message
     (conversation.messages as unknown as Array<Record<string, unknown>>).push({
@@ -108,7 +114,7 @@ router.post('/:id/message', validate(sendConversationMessageSchema), async (req,
         temperature: 0.7,
       });
 
-      let replyContent = typeof result === 'string' ? result : 'Tôi hiểu. Bạn muốn tìm hiểu thêm không?';
+      replyContent = typeof result === 'string' ? result : 'Tôi hiểu. Bạn muốn tìm hiểu thêm không?';
       let isReady = false;
 
       if (replyContent.includes('[READY]')) {
@@ -152,6 +158,17 @@ router.post('/:id/message', validate(sendConversationMessageSchema), async (req,
         time: replyTime,
         content: 'Xin lỗi, tôi gặp lỗi khi xử lý. Bạn thử lại nhé!',
       });
+    }
+
+    // Generate English title if still using default — await before save so title is in the response
+    if (needsTitle) {
+      const generatedTitle = await generateConversationTitle(
+        content,
+        replyContent || undefined
+      ).catch(() => null);
+      if (generatedTitle) {
+        conversation.title = generatedTitle;
+      }
     }
 
     await conversation.save();
