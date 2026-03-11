@@ -4,7 +4,7 @@ import { api } from '../lib/api';
 
 export function useSSE(poolId: string | null) {
   const esRef = useRef<EventSource | null>(null);
-  const { addMessage, updateAgentState, updateQueue, setPoolComplete } =
+  const { addMessage, updateTypingMessage, updateAgentState, updateQueue, setPoolComplete } =
     useMeetingStore();
 
   useEffect(() => {
@@ -46,14 +46,19 @@ export function useSSE(poolId: string | null) {
               });
               break;
             case 'agent_thinking':
-              // Update last typing message with thinking content
+              // Fallback: update typing indicator if a separate thinking event arrives
+              // Primary path: thinking data is now sent directly in agent_message
+              updateTypingMessage(data.agentId, data.content, data.thinkSec);
               break;
             case 'agent_message':
               addMessage({
                 type: 'agent',
                 agentId: data.agentId,
                 agentName: data.agentName,
+                icon: data.icon,
                 content: data.content,
+                thinking: data.thinking,
+                thinkSec: data.thinkSec,
                 timestamp: now,
               });
               break;
@@ -88,5 +93,5 @@ export function useSSE(poolId: string | null) {
       esRef.current?.close();
       esRef.current = null;
     };
-  }, [poolId, addMessage, updateAgentState, updateQueue, setPoolComplete]);
+  }, [poolId, addMessage, updateTypingMessage, updateAgentState, updateQueue, setPoolComplete]);
 }

@@ -24,6 +24,7 @@ interface MeetingState {
 
   setCurrentPool: (poolId: string, pool: Pool) => void;
   addMessage: (message: MeetingMessage) => void;
+  updateTypingMessage: (agentId: string, thinking: string, thinkSec: number) => void;
   updateAgentState: (agentId: string, state: string) => void;
   updateQueue: (queue: { agentId: string; position: number }[]) => void;
   setPoolComplete: (wrapUp: string) => void;
@@ -49,8 +50,17 @@ export const useMeetingStore = create<MeetingState>((set) => ({
   addMessage: (message) =>
     set((s) => {
       const msgWithId = { ...message, id: message.id || crypto.randomUUID() };
-      // When an actual agent message arrives, remove the typing indicator for that agent
+      // When an actual agent message arrives, inherit thinking data from typing indicator, then remove it
       if (msgWithId.type === 'agent' && msgWithId.agentId) {
+        const typingMsg = s.messages.find(
+          (m) => m.type === 'typing' && m.agentId === msgWithId.agentId
+        );
+        if (typingMsg) {
+          msgWithId.thinking = msgWithId.thinking || typingMsg.thinking;
+          msgWithId.thinkSec = msgWithId.thinkSec ?? typingMsg.thinkSec;
+          msgWithId.icon = msgWithId.icon || typingMsg.icon;
+          msgWithId.role = msgWithId.role || typingMsg.role;
+        }
         const filtered = s.messages.filter(
           (m) => !(m.type === 'typing' && m.agentId === msgWithId.agentId)
         );
@@ -58,6 +68,14 @@ export const useMeetingStore = create<MeetingState>((set) => ({
       }
       return { messages: [...s.messages, msgWithId] };
     }),
+  updateTypingMessage: (agentId, thinking, thinkSec) =>
+    set((s) => ({
+      messages: s.messages.map((m) =>
+        m.type === 'typing' && m.agentId === agentId
+          ? { ...m, thinking, thinkSec }
+          : m
+      ),
+    })),
   updateAgentState: (agentId, state) =>
     set((s) => ({ agentStates: { ...s.agentStates, [agentId]: state } })),
   updateQueue: (queue) => set({ queue }),

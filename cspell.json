@@ -87,6 +87,7 @@
     "hgetall",
     "HGETALL",
     "hset",
-    "HSET"
+    "HSET",
+    "ciphertexts"
   ]
 }

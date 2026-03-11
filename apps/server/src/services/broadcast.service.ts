@@ -39,7 +39,8 @@ export const broadcastService = {
         agentName: string,
         icon: string,
         content: string,
-        thinkSec: number
+        thinkSec: number,
+        thinking?: string
     ) {
         await sendSSEToPool(poolId, {
             type: 'agent_message',
@@ -47,7 +48,8 @@ export const broadcastService = {
             agentName,
             icon,
             content,
-            thinkSec
+            thinkSec,
+            thinking,
         });
     },
 
@@ -57,6 +59,22 @@ export const broadcastService = {
 
     async broadcastError(poolId: string, message: string) {
         await sendSSEToPool(poolId, { type: 'error', message });
+    },
+
+    async broadcastAgentThinking(
+        poolId: string,
+        agentId: string,
+        agentName: string,
+        content: string,
+        thinkSec: number
+    ) {
+        await sendSSEToPool(poolId, {
+            type: 'agent_thinking',
+            agentId,
+            agentName,
+            content,
+            thinkSec,
+        });
     },
 
     async broadcastAgentStopTyping(poolId: string, agentId: string) {

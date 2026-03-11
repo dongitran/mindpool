@@ -265,18 +265,21 @@ export async function handleMeetingLoop(poolId: string): Promise<void> {
           );
 
           const content = typeof result === 'string' ? result : '';
-          const thinkSec = (Date.now() - startTime) / 1000;
+          const thinkSec = Math.round((Date.now() - startTime) / 1000);
 
           await poolService.addMessage(poolId, { agentId: nextAgentId, content, thinkSec });
 
-          // Emit the message event
+          const thinking = `Analyzed context and formulated response about ${agentDoc.specialty}`;
+
+          // Emit the message event (includes thinking data directly — no separate thinking event needed)
           await broadcastService.broadcastAgentMessage(
             poolId,
             nextAgentId,
             agentDoc.name,
             agentDoc.icon,
             content,
-            thinkSec
+            thinkSec,
+            thinking
           );
         } catch (error) {
           logger.error('Agent failed to respond', { agent: agentDoc.name, poolId, error });

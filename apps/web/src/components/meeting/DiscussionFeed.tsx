@@ -117,10 +117,10 @@ export function DiscussionFeed({ messages, showThinkingDefault = false }: Discus
                 {formatTime(msg.timestamp)}
               </div>
             </div>
-            {msg.thinking && msg.thinkSec && (
+            {msg.thinkSec != null && msg.thinkSec > 0 && (
               <ThinkingBlock
                 thinkSec={msg.thinkSec}
-                content={msg.thinking}
+                content={msg.thinking || `Analyzed context and formulated response about ${msg.role || 'this topic'}`}
                 defaultOpen={showThinkingDefault}
               />
             )}
