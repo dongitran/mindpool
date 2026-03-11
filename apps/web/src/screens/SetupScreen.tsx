@@ -43,7 +43,7 @@ const GREETING: ConvMessage = {
   type: 'bot',
   time: makeTime(),
   content:
-    'Xin chào! Tôi là <strong>MindX</strong> — trợ lý điều phối của Mindpool.<br><br>Hãy mô tả chủ đề bạn muốn thảo luận — tôi sẽ gợi ý những expert agent phù hợp nhất và tạo <strong>Mindpool</strong> cho bạn. 🎯',
+    'Xin chào! Tôi là **MindX** — trợ lý điều phối của Mindpool.\n\nHãy mô tả chủ đề bạn muốn thảo luận — tôi sẽ gợi ý những expert agent phù hợp nhất và tạo **Mindpool** cho bạn. 🎯',
 };
 
 export function SetupScreen() {
