@@ -4,7 +4,7 @@ test.describe('Chat Input Integration', () => {
   test('should allow user to type and send a setup message successfully', async ({ page }) => {
     // 1. Visit the app
     page.on('console', msg => console.log('BROWSER LOG:', msg.text()));
-    await page.goto('http://localhost:3000/');
+    await page.goto('/');
 
     // 2. Click "Tạo Mindpool đầu tiên" to navigate to setup screen
     await page.click('text=✦ Tạo Mindpool đầu tiên');
