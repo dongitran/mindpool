@@ -4,8 +4,9 @@ import { api } from '../lib/api';
 
 export function useSSE(poolId: string | null) {
   const esRef = useRef<EventSource | null>(null);
+  const lastTimestampRef = useRef<string | undefined>(undefined);
   const { addMessage, updateTypingMessage, updateAgentState, updateQueue, setPoolComplete } =
-    useMeetingStore();
+    useMeetingStore((s) => s);
 
   useEffect(() => {
     if (!poolId) return;
@@ -20,9 +21,45 @@ export function useSSE(poolId: string | null) {
           const now = new Date().toISOString();
 
           switch (data.type) {
-            case 'message':
-              // EventSource naturally handles Last-Event-ID, no manual tracking needed
+            case 'message': {
+              const msg = data.message;
+              // Replayed stored message — update our timestamp watermark
+              if (msg?.timestamp) {
+                lastTimestampRef.current = msg.timestamp;
+              }
+              // It's a User or an Agent message from history
+              if (msg) {
+                if (msg.agentId === 'user') {
+                  addMessage({
+                    type: 'user',
+                    content: msg.content,
+                    timestamp: msg.timestamp,
+                    skipStream: true,
+                  });
+                } else if (msg.agentId === 'mindx') {
+                  addMessage({
+                    type: 'mindx',
+                    icon: '🧠',
+                    agentName: 'MindX',
+                    role: 'Orchestrator',
+                    content: msg.content,
+                    timestamp: msg.timestamp,
+                    skipStream: true,
+                  });
+                } else {
+                  addMessage({
+                    type: 'agent',
+                    agentId: msg.agentId,
+                    // Note: name/icon might be missing in history if DB schema doesn't store it, 
+                    // but AgentsPanel info usually covers it. For now, we restore content.
+                    content: msg.content,
+                    timestamp: msg.timestamp,
+                    skipStream: true,
+                  });
+                }
+              }
               break;
+            }
             case 'mindx_announce':
               addMessage({
                 type: 'mindx',
@@ -81,9 +118,12 @@ export function useSSE(poolId: string | null) {
       };
 
       es.onerror = () => {
-        // Native EventSource automatically tries to reconnect.
-        // We only close it completely if component unmounts.
-        console.warn('SSE connection error / dropped, browser will reconnect automatically.');
+        // Reconnect after 3s, passing lastTimestamp so server skips already-seen messages
+      setTimeout(() => {
+        if (esRef.current === es) {
+          connect(lastTimestampRef.current);
+        }
+      }, 3000);
       };
     }
 

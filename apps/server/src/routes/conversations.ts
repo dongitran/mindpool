@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import { Conversation } from '../models';
-import { llmRouter } from '../services/mindx.service';
+import { llmRouter, analyzeTopicAndSuggestAgents } from '../services/mindx.service';
 import type { ChatMessage } from '@mindpool/shared';
 import { logger } from '../lib/logger';
 import { validate } from '../middleware/validate';
@@ -27,7 +27,7 @@ router.post('/', validate(createConversationSchema), async (req, res, next) => {
         {
           type: 'bot',
           time: now,
-          content: 'Xin chào! Tôi là MindX. Bạn muốn thảo luận về chủ đề gì?',
+          content: 'Xin chào! Tôi là **MindX** — trợ lý điều phối của Mindpool.\n\nHãy mô tả chủ đề bạn muốn thảo luận — tôi sẽ gợi ý những expert agent phù hợp nhất và tạo **Mindpool** cho bạn. 🎯',
         },
       ],
     });
@@ -99,7 +99,7 @@ router.post('/:id/message', validate(sendConversationMessageSchema), async (req,
     chatHistory.unshift({
       role: 'system',
       content:
-        'You are MindX, a helpful AI assistant that helps users explore topics by suggesting expert agents for group discussions. Respond in Vietnamese. Be concise and friendly.',
+        'You are MindX, a helpful AI assistant that helps users explore topics by suggesting expert agents for group discussions. Respond in Vietnamese. Be concise and friendly. If the user provides a clear topic that is ready for discussion, include the exact string "[READY]" at the very beginning of your response. When responding with [READY], provide a short encouraging introduction about the topic, but DO NOT list the suggested agents in the text response, as they will be displayed as interactive selection blocks automatically.',
     });
 
     try {
@@ -108,17 +108,39 @@ router.post('/:id/message', validate(sendConversationMessageSchema), async (req,
         temperature: 0.7,
       });
 
-      const replyContent = typeof result === 'string' ? result : 'Tôi hiểu. Bạn muốn tìm hiểu thêm không?';
+      let replyContent = typeof result === 'string' ? result : 'Tôi hiểu. Bạn muốn tìm hiểu thêm không?';
+      let isReady = false;
+
+      if (replyContent.includes('[READY]')) {
+        isReady = true;
+        replyContent = replyContent.replace('[READY]', '').trim();
+        // Remove empty lines at the beginning just in case
+        replyContent = replyContent.replace(/^[\r\n]+/, '');
+      }
+
       const replyTime = new Date().toLocaleTimeString('vi-VN', {
         hour: '2-digit',
         minute: '2-digit',
       });
 
-      (conversation.messages as unknown as Array<Record<string, unknown>>).push({
-        type: 'bot',
-        time: replyTime,
-        content: replyContent,
-      });
+      if (isReady) {
+        const topic = content; // use the user's latest input as topic for simplicity
+        const suggestions = await analyzeTopicAndSuggestAgents(topic);
+        
+        (conversation.messages as unknown as Array<Record<string, unknown>>).push({
+          type: 'bot-agents',
+          time: replyTime,
+          intro: replyContent,
+          agents: suggestions,
+          btnId: `start-btn-${conversation._id}`,
+        });
+      } else {
+        (conversation.messages as unknown as Array<Record<string, unknown>>).push({
+          type: 'bot',
+          time: replyTime,
+          content: replyContent,
+        });
+      }
     } catch (llmError) {
       logger.error('LLM error in conversation', { error: llmError });
       const replyTime = new Date().toLocaleTimeString('vi-VN', {

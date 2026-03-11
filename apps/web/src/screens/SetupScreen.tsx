@@ -13,11 +13,12 @@ interface ConvMessage {
   time: string;
   content?: string;
   intro?: string;
-  agents?: { icon: string; name: string; desc: string; checked: boolean }[];
+  agents?: { id?: string; agentId?: string; icon: string; name: string; desc: string; checked: boolean }[];
   btnId?: string;
   meetingId?: string;
   meetingTitle?: string;
   agentBadges?: string[];
+  skipStream?: boolean;
 }
 
 /** Animated "MindX is typing..." indicator */
@@ -39,11 +40,12 @@ const makeTime = () =>
   new Date().toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true });
 
 const GREETING: ConvMessage = {
-  id: crypto.randomUUID(),
+  id: 'initial-greeting',
   type: 'bot',
   time: makeTime(),
   content:
     'Xin chào! Tôi là **MindX** — trợ lý điều phối của Mindpool.\n\nHãy mô tả chủ đề bạn muốn thảo luận — tôi sẽ gợi ý những expert agent phù hợp nhất và tạo **Mindpool** cho bạn. 🎯',
+  skipStream: true,
 };
 
 export function SetupScreen() {
@@ -72,7 +74,12 @@ export function SetupScreen() {
       .getConversation(currentConversationId)
       .then((conv) => {
         if (conv.messages?.length) {
-          setMessages((conv.messages as ConvMessage[]).map(m => ({ ...m, id: m.id || crypto.randomUUID() })));
+          const historyMsgs = conv.messages.map((m: any, i: number) => ({
+            ...m,
+            id: i === 0 ? 'initial-greeting' : (m._id || m.id || crypto.randomUUID()),
+            skipStream: true
+          }));
+          setMessages(historyMsgs as ConvMessage[]);
         }
       })
       .catch(() => {
@@ -91,7 +98,11 @@ export function SetupScreen() {
 
   const handleSend = async (content: string) => {
     const userMsg: ConvMessage = { id: crypto.randomUUID(), type: 'user', time: makeTime(), content };
-    setMessages((prev) => [...prev, userMsg]);
+    // Map current messages to skipStream: true immediately to avoid any re-animation while waiting for API
+    setMessages((prev) => [
+      ...prev.map(m => ({ ...m, skipStream: true })),
+      userMsg
+    ]);
     setIsTyping(true);
 
     try {
@@ -107,17 +118,39 @@ export function SetupScreen() {
       }
 
       // ── Step 2: send message — backend returns the updated Conversation ────
+      // Keep track of our local user message ID to prevent flicker
+      const lastUserMsgId = userMsg.id;
       const updatedConv = await api.sendConversationMessage(convId, content);
       console.log('DEBUG: API Response updatedConv:', updatedConv);
 
       if (updatedConv.messages?.length) {
         console.log('DEBUG: setMessages will run with length:', updatedConv.messages.length);
         // Replace entire local message array with whatever the backend knows, 
-        // to stay perfectly in sync. Ensure all have string IDs.
-        setMessages((updatedConv.messages as ConvMessage[]).map(m => ({
-          ...m,
-          id: m.id || crypto.randomUUID()
-        })));
+        // to stay perfectly in sync. Ensure all have string IDs and skipStream for old messages.
+        setMessages(
+          updatedConv.messages.map((m: any, i: number) => {
+            let stableId = m._id || m.id;
+
+            // 1. Force Greeting stability
+            if (i === 0) {
+              stableId = 'initial-greeting';
+            } 
+            // 2. Try to match the user message we just sent locally
+            else if (m.type === 'user' && m.content === content && i >= updatedConv.messages.length - 2) {
+              stableId = lastUserMsgId;
+            }
+            // 3. Fallback to server ID or new UUID
+            else if (!stableId) {
+              stableId = crypto.randomUUID();
+            }
+
+            return {
+              ...m,
+              id: stableId,
+              skipStream: i < updatedConv.messages.length - 1,
+            };
+          }) as ConvMessage[]
+        );
       } else {
         console.log('DEBUG: No .messages array found on updatedConv', Object.keys(updatedConv));
       }
@@ -142,13 +175,20 @@ export function SetupScreen() {
     setTimeout(() => navigateToMeeting(meetingId), 600);
   };
 
-  const handleToggleAgent = (_btnId: string, index: number) => {
+  const handleToggleAgent = (_btnId: string, agentId: string) => {
     setMessages((prev) =>
       prev.map((msg) => {
         if (msg.type === 'bot-agents' && msg.agents) {
-          const newAgents = [...msg.agents];
-          newAgents[index] = { ...newAgents[index], checked: !newAgents[index].checked };
-          return { ...msg, agents: newAgents };
+          return {
+            ...msg,
+            agents: msg.agents.map((a) => {
+              const id = a.agentId || a.id || a.name;
+              if (id === agentId) {
+                return { ...a, checked: !a.checked };
+              }
+              return a;
+            }),
+          };
         }
         return msg;
       }),

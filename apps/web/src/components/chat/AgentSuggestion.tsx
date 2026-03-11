@@ -1,4 +1,6 @@
 interface Agent {
+  id?: string;
+  agentId?: string;
   icon: string;
   name: string;
   desc: string;
@@ -9,7 +11,7 @@ interface AgentSuggestionProps {
   agents: Agent[];
   meetingId: string;
   meetingCreated?: boolean;
-  onToggle: (index: number) => void;
+  onToggle: (agentId: string) => void;
   onStart: () => void;
   onGoto: () => void;
 }
@@ -22,49 +24,51 @@ export function AgentSuggestion({
   onGoto,
 }: AgentSuggestionProps) {
   return (
-    <div className="mt-[11px] flex flex-col gap-[5px]">
-      {agents.map((agent, i) => (
-        <div
-          key={i}
-          onClick={() => onToggle(i)}
-          className={`flex items-center gap-2.5 p-2 px-[11px] rounded-sm border transition-all cursor-pointer hover:border-[rgba(61,255,192,0.4)] ${
-            agent.checked
-              ? 'bg-accent-dim border-[rgba(61,255,192,0.3)]'
-              : 'bg-surface-3 border-border-light'
-          }`}
-        >
+    <div className="mt-4 flex flex-col gap-2">
+      {agents
+        .filter((a) => a.name !== 'MindX')
+        .map((agent, i) => (
           <div
-            className={`w-[17px] h-[17px] rounded-[5px] border-[1.5px] flex items-center justify-center text-[9px] flex-shrink-0 transition-all ${
+            key={i}
+            onClick={() => onToggle(agent.agentId || agent.id || agent.name)}
+            className={`flex items-center gap-4 p-4 rounded-xl border transition-all cursor-pointer hover:border-[rgba(61,255,192,0.4)] ${
               agent.checked
-                ? 'bg-accent border-accent text-bg'
-                : 'border-border-light'
+                ? 'bg-accent/10 border-accent/30'
+                : 'bg-surface-3 border-white/5'
             }`}
           >
-            {agent.checked ? '✓' : ''}
-          </div>
-          <div className="text-[15px]">{agent.icon}</div>
-          <div className="flex-1">
-            <div className="text-[12.5px] font-semibold text-text">
-              {agent.name}
+            <div
+              className={`w-6 h-6 rounded-md border-2 flex items-center justify-center text-sm flex-shrink-0 transition-all ${
+                agent.checked
+                  ? 'bg-accent border-accent text-bg'
+                  : 'border-white/10'
+              }`}
+            >
+              {agent.checked ? '✓' : ''}
             </div>
-            <div className="text-[10.5px] text-text-muted mt-px">
-              {agent.desc}
+            <div className="text-2xl">{agent.icon}</div>
+            <div className="flex-1">
+              <div className="text-[15px] font-bold text-text mb-0.5">
+                {agent.name}
+              </div>
+              <div className="text-[13px] text-text-muted leading-tight">
+                {agent.desc}
+              </div>
             </div>
           </div>
-        </div>
-      ))}
+        ))}
 
       {meetingCreated ? (
         <button
           onClick={onGoto}
-          className="mt-[13px] w-full py-[11px] px-[18px] bg-surface-3 text-accent border border-[rgba(61,255,192,0.3)] rounded-sm font-[Sora] text-[13.5px] font-bold cursor-pointer flex items-center justify-center gap-2"
+          className="mt-4 w-full py-4 px-6 bg-surface-3 text-accent border border-accent/30 rounded-xl font-[Sora] text-base font-bold cursor-pointer flex items-center justify-center gap-2 transition-all hover:bg-surface-4"
         >
           → Vào Meeting
         </button>
       ) : (
         <button
           onClick={onStart}
-          className="mt-[13px] w-full py-[11px] px-[18px] bg-gradient-to-br from-accent to-[#2de8a8] border-none rounded-sm text-bg font-[Sora] text-[13.5px] font-bold cursor-pointer flex items-center justify-center gap-2 transition-all hover:translate-y-[-1px] hover:shadow-[0_8px_24px_rgba(61,255,192,0.3)]"
+          className="mt-4 w-full py-4 px-6 bg-gradient-to-br from-accent to-[#2de8a8] border-none rounded-xl text-bg font-[Sora] text-base font-bold cursor-pointer flex items-center justify-center gap-2 transition-all hover:translate-y-[-1px] hover:shadow-[0_8px_24px_rgba(61,255,192,0.3)] active:translate-y-[1px]"
         >
           🚀 Bắt đầu Meeting
         </button>

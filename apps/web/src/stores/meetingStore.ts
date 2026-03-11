@@ -12,6 +12,7 @@ interface MeetingMessage {
   thinking?: string;
   thinkSec?: number;
   timestamp: string;
+  skipStream?: boolean;
 }
 
 interface MeetingState {

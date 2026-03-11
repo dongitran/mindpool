@@ -1,17 +1,20 @@
 # Mindpool — Agent Guidelines
 
+## 🤖 AI Agent Instructions (CRITICAL)
+- **MANDATORY FIRST STEP**: You MUST **ALWAYS** read and review all relevant rule files inside the `.agents/rules/` directory before starting any task or writing any code. These rules govern how you should implement features, debug, and document changes.
+
 ## Project Overview
 Mindpool is an AI multi-agent discussion platform. Users create "pools" (meeting rooms) with AI expert agents, each with a distinct perspective, collaboratively analyzing and debating any topic via a raise-hand queue system.
 
 ## Architecture
-```
+```text
 mindpool/
 ├── apps/
 │   ├── web/          # React 19 + Vite + Zustand + TailwindCSS + Framer Motion
 │   └── server/       # Express + TypeScript + Mongoose + ioredis
 ├── packages/
 │   └── shared/       # @mindpool/shared — shared TypeScript types
-├── .agents/          # Agent configs & rules
+├── .agents/          # Agent rules
 ├── e2e/              # Playwright E2E tests
 ├── scripts/          # seed-db.ts, reset-dev.ts
 ├── infra/            # Pulumi (GKE deployment)

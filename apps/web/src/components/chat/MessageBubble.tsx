@@ -2,13 +2,22 @@ import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { AgentSuggestion } from './AgentSuggestion';
 
+// Defensive replacement for old database entries that might contain raw HTML
+const sanitizeMarkdown = (text?: string) => {
+  if (!text) return '';
+  return text
+    .replace(/<strong>/g, '**')
+    .replace(/<\/strong>/g, '**')
+    .replace(/<br\s*\/?>/g, '\n');
+};
+
 interface MessageProps {
   message: {
     type: 'bot' | 'user' | 'bot-agents' | 'bot-created';
     time: string;
     content?: string;
     intro?: string;
-    agents?: { icon: string; name: string; desc: string; checked: boolean }[];
+    agents?: { id?: string; agentId?: string; icon: string; name: string; desc: string; checked: boolean }[];
     btnId?: string;
     meetingId?: string;
     meetingTitle?: string;
@@ -16,7 +25,7 @@ interface MessageProps {
   };
   onStartMeeting?: (meetingId: string) => void;
   onGoToMeeting?: (meetingId: string) => void;
-  onToggleAgent?: (btnId: string, index: number) => void;
+  onToggleAgent?: (btnId: string, agentId: string) => void;
   meetingCreated?: boolean;
 }
 
@@ -29,16 +38,16 @@ export function MessageBubble({
 }: MessageProps) {
   if (message.type === 'user') {
     return (
-      <div className="flex justify-end px-[22px] py-1 mb-1 animate-msg-in">
+      <div className="flex justify-end gap-3 px-[22px] py-1 mb-1 animate-msg-in">
         <div className="max-w-[520px]">
-          <div className="px-[15px] py-[11px] rounded-[14px] rounded-tr bg-accent-dim border border-[rgba(61,255,192,0.2)] text-text text-[13.5px] leading-[1.65]">
+          <div className="px-[15px] py-[11px] rounded-[14px] rounded-tr-[4px] bg-accent-dim border border-[rgba(61,255,192,0.2)] text-text text-[13.5px] leading-[1.65]">
             {message.content}
           </div>
           <div className="text-[10px] text-text-dim mt-1 px-1 text-right">
             {message.time}
           </div>
         </div>
-        <div className="w-7 h-7 rounded-full flex-shrink-0 flex items-center justify-center text-[10px] font-bold bg-surface-3 border border-border-light text-text-muted ml-3 mt-0.5">
+        <div className="w-7 h-7 rounded-full flex-shrink-0 flex items-center justify-center text-[10px] font-bold bg-surface-3 border border-border-light text-text-muted mt-0.5">
           DT
         </div>
       </div>
@@ -52,9 +61,9 @@ export function MessageBubble({
           🧠
         </div>
         <div className="max-w-[520px]">
-          <div className="px-[15px] py-[11px] rounded-[14px] rounded-tl bg-surface-2 border border-border text-text text-[13.5px] leading-[1.65] prose prose-invert max-w-none prose-p:leading-relaxed prose-pre:bg-surface-3 prose-pre:border prose-pre:border-border-light prose-sm">
+          <div className="px-[15px] py-[11px] rounded-[14px] rounded-tl-[4px] bg-surface-2 border border-border text-text text-[13.5px] leading-[1.65] prose prose-invert max-w-none prose-p:leading-relaxed prose-pre:bg-surface-3 prose-pre:border prose-pre:border-border-light prose-sm">
             <ReactMarkdown remarkPlugins={[remarkGfm]}>
-              {message.content || ''}
+              {sanitizeMarkdown(message.content)}
             </ReactMarkdown>
           </div>
           <div className="text-[10px] text-text-dim mt-1 px-1">
@@ -72,19 +81,19 @@ export function MessageBubble({
           🧠
         </div>
         <div className="max-w-[520px]">
-          <div className="px-[15px] py-[11px] rounded-[14px] rounded-tl bg-surface-2 border border-border text-text text-[13.5px] leading-[1.65] prose prose-invert max-w-none prose-p:leading-relaxed prose-pre:bg-surface-3 prose-pre:border prose-pre:border-border-light prose-sm">
+          <div className="px-[15px] py-[11px] rounded-[14px] rounded-tl-[4px] bg-surface-2 border border-border text-text text-[13.5px] leading-[1.65] prose prose-invert max-w-none prose-p:leading-relaxed prose-pre:bg-surface-3 prose-pre:border prose-pre:border-border-light prose-sm">
             <ReactMarkdown remarkPlugins={[remarkGfm]}>
-              {message.intro || ''}
+              {sanitizeMarkdown(message.intro)}
             </ReactMarkdown>
-            <AgentSuggestion
-              agents={message.agents || []}
-              meetingId={message.meetingId || ''}
-              meetingCreated={meetingCreated}
-              onToggle={(i) => onToggleAgent?.(message.btnId || '', i)}
-              onStart={() => onStartMeeting?.(message.meetingId || '')}
-              onGoto={() => onGoToMeeting?.(message.meetingId || '')}
-            />
           </div>
+          <AgentSuggestion
+            agents={message.agents || []}
+            meetingId={message.meetingId || ''}
+            meetingCreated={meetingCreated}
+            onToggle={(agentId) => onToggleAgent?.(message.btnId || '', agentId)}
+            onStart={() => onStartMeeting?.(message.meetingId || '')}
+            onGoto={() => onGoToMeeting?.(message.meetingId || '')}
+          />
           <div className="text-[10px] text-text-dim mt-1 px-1">
             {message.time}
           </div>
@@ -100,7 +109,7 @@ export function MessageBubble({
           🧠
         </div>
         <div className="max-w-[520px]">
-          <div className="mt-[11px] p-[13px_15px] bg-surface-3 border border-[rgba(61,255,192,0.25)] rounded relative overflow-hidden">
+          <div className="mt-[11px] py-[13px] px-[15px] bg-surface-3 border border-[rgba(61,255,192,0.25)] rounded-[12px] relative overflow-hidden">
             <div className="absolute top-0 left-0 w-[3px] h-full bg-accent" />
             <div className="flex items-center gap-2 mb-[7px]">
               <span className="text-[9.5px] font-bold px-2 py-0.5 bg-accent-dim border border-[rgba(61,255,192,0.3)] text-accent rounded-full uppercase tracking-wider">

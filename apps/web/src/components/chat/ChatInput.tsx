@@ -40,7 +40,7 @@ export function ChatInput({
 
   return (
     <div className="px-[22px] py-[14px] pb-[18px] border-t border-border flex-shrink-0">
-      <div className="flex items-end gap-2.5 px-3.5 py-2.5 bg-surface-2 border border-border-light rounded transition-colors focus-within:border-[rgba(61,255,192,0.4)]">
+      <div className="flex items-end gap-2.5 px-3.5 py-2.5 bg-surface-2 border border-border-light rounded-[12px] transition-colors focus-within:border-[rgba(61,255,192,0.4)]">
         <textarea
           ref={textareaRef}
           value={message}

@@ -47,8 +47,10 @@ function getStopDetector(poolId: string): StopSignalDetector {
 
 export async function analyzeTopicAndSuggestAgents(topic: string) {
   const allAgents = await Agent.find();
+  // MindX is the orchestrator — always included by default, never shown for selection
+  const selectableAgents = allAgents.filter((a) => a.name !== 'MindX');
 
-  const suggestions = allAgents.map((agent) => {
+  const suggestions = selectableAgents.map((agent) => {
     const topicLower = topic.toLowerCase();
     const specialtyLower = agent.specialty.toLowerCase();
     const relevance =
