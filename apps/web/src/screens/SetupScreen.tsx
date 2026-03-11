@@ -5,6 +5,7 @@ import { ChatInput } from '../components/chat/ChatInput';
 import { TypingIndicator } from '../components/chat/TypingIndicator';
 import { Tag } from '../components/ui/Tag';
 import { api } from '../lib/api';
+import { useStreamingQueue } from '../hooks/useStreamingQueue';
 
 interface ConvMessage {
   id?: string;
@@ -79,12 +80,14 @@ export function SetupScreen() {
       });
   }, [currentConversationId]);
 
-  // Auto-scroll to bottom when messages change
+  // Auto-scroll to bottom when new messages arrive (but not during streaming)
   useEffect(() => {
     if (msgsRef.current) {
       msgsRef.current.scrollTop = msgsRef.current.scrollHeight;
     }
-  }, [messages, isTyping]);
+  }, [messages.length, isTyping]);
+
+  const displayedMessages = useStreamingQueue(messages, 20);
 
   const handleSend = async (content: string) => {
     const userMsg: ConvMessage = { id: crypto.randomUUID(), type: 'user', time: makeTime(), content };
@@ -172,7 +175,7 @@ export function SetupScreen() {
 
       {/* Messages */}
       <div ref={msgsRef} className="flex-1 overflow-y-auto py-[22px] scrollbar-thin">
-        {messages.map((msg, i) => {
+        {displayedMessages.map((msg, i) => {
           const msgKey = msg.id || `${msg.time}-${msg.type}-${i}`;
           return (
             <MessageBubble

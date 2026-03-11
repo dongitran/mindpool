@@ -1,5 +1,7 @@
 import { useEffect, useRef } from 'react';
-import { sanitizeHTML } from '../../lib/sanitize';
+import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
+import { useStreamingQueue } from '../../hooks/useStreamingQueue';
 import { ThinkingBlock } from './ThinkingBlock';
 
 interface FeedMessage {
@@ -49,18 +51,21 @@ function formatTime(ts: string) {
 export function DiscussionFeed({ messages, showThinkingDefault = false }: DiscussionFeedProps) {
   const feedRef = useRef<HTMLDivElement>(null);
 
+  // Scroll to bottom only when a new message arrives or an external push happens
   useEffect(() => {
     if (feedRef.current) {
       feedRef.current.scrollTop = feedRef.current.scrollHeight;
     }
-  }, [messages]);
+  }, [messages.length]);
+
+  const displayedMessages = useStreamingQueue(messages, 20);
 
   return (
     <div
       ref={feedRef}
       className="flex-1 overflow-y-auto px-[22px] py-[18px] scrollbar-thin"
     >
-      {messages.map((msg, i) => {
+      {displayedMessages.map((msg, i) => {
         const msgKey = msg.id || `${msg.timestamp}-${msg.type}-${i}`;
         if (msg.type === 'user') {
           return (
@@ -125,12 +130,15 @@ export function DiscussionFeed({ messages, showThinkingDefault = false }: Discus
               />
             )}
             <div
-              className={`px-4 py-[11px] rounded-[14px] rounded-tl text-[13.5px] leading-relaxed text-text ${isMindX
+              className={`px-4 py-[11px] rounded-[14px] rounded-tl text-[13.5px] leading-relaxed text-text prose prose-invert max-w-none prose-p:my-2 prose-pre:my-3 prose-pre:bg-surface prose-pre:border prose-pre:border-border prose-code:text-[#3DFFC0] prose-code:bg-[rgba(61,255,192,0.1)] prose-code:px-1 prose-code:py-0.5 prose-code:rounded-md prose-code:before:content-none prose-code:after:content-none prose-ul:my-2 prose-li:my-0.5 ${isMindX
                 ? 'bg-[rgba(61,255,192,0.05)] border border-[rgba(61,255,192,0.2)] border-l-2 border-l-accent'
                 : 'bg-surface-2 border border-border'
                 }`}
-              dangerouslySetInnerHTML={{ __html: sanitizeHTML(msg.content) }}
-            />
+            >
+              <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                {msg.content}
+              </ReactMarkdown>
+            </div>
           </div>
         );
       })}

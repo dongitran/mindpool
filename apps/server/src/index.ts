@@ -39,10 +39,12 @@ app.use(
 );
 app.use(express.json({ limit: '1mb' }));
 
+const isDev = process.env.NODE_ENV === 'development' || process.env.NODE_ENV === 'test';
+
 // Rate limiting
 const globalLimiter = rateLimit({
   windowMs: 60_000,
-  max: 100,
+  max: isDev ? 1000 : 100,
   standardHeaders: true,
   legacyHeaders: false,
   store: new RedisStore({ sendCommand: (...args: string[]) => redis.call(args[0], ...args.slice(1)) as Promise<RedisReply> }),
@@ -51,7 +53,7 @@ const globalLimiter = rateLimit({
 
 const poolCreateLimiter = rateLimit({
   windowMs: 60_000,
-  max: 5,
+  max: isDev ? 100 : 5,
   standardHeaders: true,
   legacyHeaders: false,
   store: new RedisStore({ sendCommand: (...args: string[]) => redis.call(args[0], ...args.slice(1)) as Promise<RedisReply> }),
@@ -60,7 +62,7 @@ const poolCreateLimiter = rateLimit({
 
 const messageLimiter = rateLimit({
   windowMs: 60_000,
-  max: 20,
+  max: isDev ? 200 : 20,
   standardHeaders: true,
   legacyHeaders: false,
   store: new RedisStore({ sendCommand: (...args: string[]) => redis.call(args[0], ...args.slice(1)) as Promise<RedisReply> }),
