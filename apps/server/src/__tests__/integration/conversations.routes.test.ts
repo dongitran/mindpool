@@ -127,4 +127,59 @@ describe('POST /conversations/:id/message — title generation', () => {
 
     expect(mockGenerateTitle).toHaveBeenCalledWith('topic', undefined);
   });
+
+  it('should retry title generation on next exchange when first returns NONE', async () => {
+    // Exchange 1: vague message → NONE → title stays default
+    mockLlmChat.mockResolvedValue('Bạn muốn thảo luận gì?');
+    mockGenerateTitle.mockResolvedValue(null);
+
+    await request(app)
+      .post('/conv-1/message')
+      .send({ content: 'Hello' })
+      .expect(200);
+
+    expect(mockGenerateTitle).toHaveBeenCalledTimes(1);
+    expect(mockConversation.title).toBe('Cuộc trò chuyện mới');
+
+    // Exchange 2: specific topic → title generated
+    vi.clearAllMocks();
+    mockConversation.save.mockResolvedValue(mockConversation);
+    // title is still default, so needsTitle = true
+    mockLlmChat.mockResolvedValue('Tuyệt vời! Hãy bắt đầu thảo luận về AI.');
+    mockGenerateTitle.mockResolvedValue('AI Strategy Discussion');
+
+    await request(app)
+      .post('/conv-1/message')
+      .send({ content: 'Analyze AI strategy for startups' })
+      .expect(200);
+
+    expect(mockGenerateTitle).toHaveBeenCalledTimes(1);
+    expect(mockConversation.title).toBe('AI Strategy Discussion');
+  });
+
+  it('should stop calling generateTitle after title is set', async () => {
+    // Exchange 1: title generated
+    mockLlmChat.mockResolvedValue('Great topic!');
+    mockGenerateTitle.mockResolvedValue('ML Deployment Strategies');
+
+    await request(app)
+      .post('/conv-1/message')
+      .send({ content: 'ML deployment' })
+      .expect(200);
+
+    expect(mockConversation.title).toBe('ML Deployment Strategies');
+
+    // Exchange 2: title already set → should NOT call generateTitle
+    vi.clearAllMocks();
+    mockConversation.save.mockResolvedValue(mockConversation);
+    // title is now 'ML Deployment Strategies' (not default)
+    mockLlmChat.mockResolvedValue('Follow up response');
+
+    await request(app)
+      .post('/conv-1/message')
+      .send({ content: 'Tell me more' })
+      .expect(200);
+
+    expect(mockGenerateTitle).not.toHaveBeenCalled();
+  });
 });

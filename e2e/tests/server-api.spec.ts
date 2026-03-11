@@ -45,6 +45,34 @@ test.describe.serial('Server API Endpoints', () => {
 
 
 
+  test('POST /api/conversations/:id/message should generate English title for new conversation', async ({ request }) => {
+    test.setTimeout(120000);
+
+    // Create a fresh conversation (default title)
+    const createRes = await request.post('/api/conversations');
+    expect(createRes.ok()).toBeTruthy();
+    const created = await createRes.json();
+    expect(created.title).toBe('Cuộc trò chuyện mới');
+
+    // Send a specific topic message — should trigger title generation
+    const msgRes = await request.post(`/api/conversations/${created._id}/message`, {
+      data: { content: 'I want to analyze machine learning deployment strategies for production systems' }
+    });
+    expect(msgRes.ok()).toBeTruthy();
+    const updated = await msgRes.json();
+
+    // Title should have been generated (not default)
+    // Note: LLM might return NONE for very vague messages, but this topic is specific enough
+    expect(updated.title).not.toBe('Cuộc trò chuyện mới');
+    expect(updated.title.length).toBeGreaterThan(0);
+    expect(updated.title.length).toBeLessThan(100);
+
+    // Verify title persists via GET
+    const getRes = await request.get(`/api/conversations/${created._id}`);
+    const fetched = await getRes.json();
+    expect(fetched.title).toBe(updated.title);
+  });
+
   test('GET /api/pool/:id should fetch a valid pool detail (Meeting Room)', async ({ request }) => {
     test.skip(!poolId, 'Needs poolId from previous tests');
     
