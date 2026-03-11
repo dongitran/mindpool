@@ -53,6 +53,22 @@ export const broadcastService = {
         });
     },
 
+    async broadcastAgentChunk(
+        poolId: string,
+        agentId: string,
+        agentName: string,
+        icon: string,
+        chunk: string
+    ) {
+        await sendSSEToPool(poolId, {
+            type: 'agent_chunk',
+            agentId,
+            agentName,
+            icon,
+            chunk,
+        });
+    },
+
     async broadcastAgentDone(poolId: string, agentId: string) {
         await sendSSEToPool(poolId, { type: 'agent_done', agentId });
     },

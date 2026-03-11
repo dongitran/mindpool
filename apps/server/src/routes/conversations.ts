@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { Conversation } from '../models';
 import { llmRouter, analyzeTopicAndSuggestAgents, generateConversationTitle } from '../services/mindx.service';
+import { parseSSEStream } from '../llm/stream-parser';
 import type { ChatMessage } from '@mindpool/shared';
 import { logger } from '../lib/logger';
 import { validate } from '../middleware/validate';
@@ -64,7 +65,7 @@ router.get('/:id', async (req, res, next) => {
   }
 });
 
-// POST /conversations/:id/message — send user message, get MindX reply
+// POST /conversations/:id/message — send user message, stream MindX reply via SSE
 router.post('/:id/message', validate(sendConversationMessageSchema), async (req, res, next) => {
   try {
     const conversation = await Conversation.findById(req.params.id);
@@ -108,19 +109,78 @@ router.post('/:id/message', validate(sendConversationMessageSchema), async (req,
         'You are MindX, a helpful AI assistant that helps users explore topics by suggesting expert agents for group discussions. Respond in Vietnamese. Be concise and friendly. If the user provides a clear topic that is ready for discussion, include the exact string "[READY]" at the very beginning of your response. When responding with [READY], provide a short encouraging introduction about the topic, but DO NOT list the suggested agents in the text response, as they will be displayed as interactive selection blocks automatically.',
     });
 
+    // Set up SSE streaming headers
+    res.setHeader('Content-Type', 'text/event-stream');
+    res.setHeader('Cache-Control', 'no-cache');
+    res.setHeader('Connection', 'keep-alive');
+    res.setHeader('X-Accel-Buffering', 'no');
+
     try {
-      const result = await llmRouter.agentChat('full_response', chatHistory, {
+      const streamResult = await llmRouter.agentChat('full_response', chatHistory, {
         maxTokens: 1024,
         temperature: 0.7,
+        stream: true,
       });
 
-      replyContent = typeof result === 'string' ? result : 'Tôi hiểu. Bạn muốn tìm hiểu thêm không?';
+      if (typeof streamResult === 'string') {
+        // Non-streaming fallback
+        replyContent = streamResult || 'Tôi hiểu. Bạn muốn tìm hiểu thêm không?';
+        res.write(`data: ${JSON.stringify({ type: 'chunk', content: replyContent })}\n\n`);
+      } else {
+        // Stream chunks to client
+        const BATCH_INTERVAL_MS = 80;
+        const BATCH_SIZE_CHARS = 30;
+        let contentBatch = '';
+        let thinkingBatch = '';
+        let lastFlush = Date.now();
+        let thinkingContent = '';
+
+        const flushBatch = () => {
+          if (thinkingBatch.length > 0) {
+            res.write(`data: ${JSON.stringify({ type: 'thinking_chunk', content: thinkingBatch })}\n\n`);
+            thinkingBatch = '';
+          }
+          if (contentBatch.length > 0) {
+            res.write(`data: ${JSON.stringify({ type: 'chunk', content: contentBatch })}\n\n`);
+            contentBatch = '';
+          }
+          lastFlush = Date.now();
+        };
+
+        try {
+          for await (const chunk of parseSSEStream(streamResult)) {
+            if (chunk.type === 'thinking') {
+              thinkingContent += chunk.text;
+              thinkingBatch += chunk.text;
+            } else {
+              replyContent += chunk.text;
+              contentBatch += chunk.text;
+            }
+
+            const totalBatch = contentBatch.length + thinkingBatch.length;
+            if (totalBatch >= BATCH_SIZE_CHARS || Date.now() - lastFlush >= BATCH_INTERVAL_MS) {
+              flushBatch();
+            }
+          }
+          flushBatch();
+          // Send thinking_done so frontend knows thinking is complete (with elapsed time placeholder)
+          if (thinkingContent) {
+            res.write(`data: ${JSON.stringify({ type: 'thinking_done' })}\n\n`);
+          }
+        } catch (streamError) {
+          logger.error('Conversation stream interrupted', { error: streamError });
+          flushBatch();
+          if (!replyContent) {
+            replyContent = 'Xin lỗi, tôi gặp lỗi khi xử lý. Bạn thử lại nhé!';
+          }
+        }
+      }
+
       let isReady = false;
 
       if (replyContent.includes('[READY]')) {
         isReady = true;
         replyContent = replyContent.replace('[READY]', '').trim();
-        // Remove empty lines at the beginning just in case
         replyContent = replyContent.replace(/^[\r\n]+/, '');
       }
 
@@ -130,9 +190,9 @@ router.post('/:id/message', validate(sendConversationMessageSchema), async (req,
       });
 
       if (isReady) {
-        const topic = content; // use the user's latest input as topic for simplicity
+        const topic = content;
         const suggestions = await analyzeTopicAndSuggestAgents(topic);
-        
+
         (conversation.messages as unknown as Array<Record<string, unknown>>).push({
           type: 'bot-agents',
           time: replyTime,
@@ -160,7 +220,7 @@ router.post('/:id/message', validate(sendConversationMessageSchema), async (req,
       });
     }
 
-    // Generate English title if still using default — await before save so title is in the response
+    // Generate English title if still using default
     if (needsTitle) {
       const generatedTitle = await generateConversationTitle(
         content,
@@ -172,7 +232,10 @@ router.post('/:id/message', validate(sendConversationMessageSchema), async (req,
     }
 
     await conversation.save();
-    res.json(conversation);
+
+    // Send final conversation state for sync
+    res.write(`data: ${JSON.stringify({ type: 'done', conversation })}\n\n`);
+    res.end();
   } catch (error) {
     next(error);
   }

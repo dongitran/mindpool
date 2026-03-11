@@ -24,6 +24,57 @@ export const api = {
       method: 'POST',
       body: JSON.stringify({ content }),
     }),
+  sendConversationMessageStream: async (
+    id: string,
+    content: string,
+    onChunk: (chunk: string) => void,
+    onThinkingChunk?: (chunk: string) => void,
+    onThinkingDone?: () => void,
+  ): Promise<Conversation> => {
+    const res = await fetch(`${API_BASE}/conversations/${id}/message`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ content }),
+    });
+    if (!res.ok) throw new Error(`API Error: ${res.status}`);
+    if (!res.body) throw new Error('No response body');
+
+    const reader = res.body.getReader();
+    const decoder = new TextDecoder();
+    let buffer = '';
+    let finalConversation: Conversation | null = null;
+
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+
+      buffer += decoder.decode(value, { stream: true });
+      const lines = buffer.split('\n');
+      buffer = lines.pop() || '';
+
+      for (const line of lines) {
+        const trimmed = line.trim();
+        if (!trimmed.startsWith('data: ')) continue;
+        try {
+          const data = JSON.parse(trimmed.slice(6));
+          if (data.type === 'chunk') {
+            onChunk(data.content);
+          } else if (data.type === 'thinking_chunk') {
+            onThinkingChunk?.(data.content);
+          } else if (data.type === 'thinking_done') {
+            onThinkingDone?.();
+          } else if (data.type === 'done') {
+            finalConversation = data.conversation as Conversation;
+          }
+        } catch {
+          // Skip malformed JSON
+        }
+      }
+    }
+
+    if (!finalConversation) throw new Error('Stream ended without final conversation');
+    return finalConversation;
+  },
 
   // Pools
   createPool: (topic: string, agentIds: string[], conversationId: string) =>

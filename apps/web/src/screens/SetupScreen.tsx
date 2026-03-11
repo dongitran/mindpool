@@ -12,6 +12,8 @@ import { useStreamingQueue } from '../hooks/useStreamingQueue';
 interface ConvMessage extends ConversationMessage {
   id: string;
   skipStream?: boolean;
+  thinking?: string;
+  isThinkingDone?: boolean;
 }
 
 type RawConversationMessage = ConversationMessage & { _id?: string; id?: string };
@@ -26,6 +28,29 @@ function SetupTypingIndicator() {
       <div className="max-w-[520px]">
         <TypingIndicator />
       </div>
+    </div>
+  );
+}
+
+/** Collapsible thinking/reasoning block */
+function ThinkingBlock({ thinking, isDone }: { thinking: string; isDone?: boolean }) {
+  const [isOpen, setIsOpen] = useState(false);
+  if (!thinking) return null;
+
+  return (
+    <div className="mb-2">
+      <button
+        onClick={() => setIsOpen(!isOpen)}
+        className="inline-flex items-center gap-1.5 text-[11px] text-text-muted cursor-pointer px-2.5 py-1 rounded-full bg-surface-2 border border-border transition-all select-none font-mono hover:text-text hover:border-border-light"
+      >
+        <span className={`text-[8px] transition-transform duration-200 ${isOpen ? 'rotate-90' : ''}`}>▶</span>
+        {isDone ? '💭 Thought process' : '💭 Đang suy nghĩ...'}
+      </button>
+      {isOpen && (
+        <div className="mt-1.5 px-3 py-2.5 bg-surface-2 border border-border rounded-sm border-l-2 border-l-purple text-[11.5px] leading-[1.7] text-text-muted font-mono animate-fade-in whitespace-pre-wrap max-h-[300px] overflow-y-auto scrollbar-thin">
+          {thinking}
+        </div>
+      )}
     </div>
   );
 }
@@ -113,44 +138,72 @@ export function SetupScreen() {
         setCurrentConversation(convId);
       }
 
-      // ── Step 2: send message — backend returns the updated Conversation ────
-      // Keep track of our local user message ID to prevent flicker
+      // ── Step 2: send message via streaming SSE ────
       const lastUserMsgId = userMsg.id;
-      const updatedConv = await api.sendConversationMessage(convId, content);
+      const streamingBotId = crypto.randomUUID();
+
+      // Add a placeholder bot message that will be updated as chunks arrive
+      setMessages((prev) => [
+        ...prev,
+        { id: streamingBotId, type: 'bot', time: makeTime(), content: '', skipStream: true },
+      ]);
+      setIsTyping(false); // Hide typing indicator — we're now streaming content
+
+      const updatedConv = await api.sendConversationMessageStream(
+        convId,
+        content,
+        (chunk: string) => {
+          // Append each content chunk to the streaming bot message
+          setMessages((prev) =>
+            prev.map((m) =>
+              m.id === streamingBotId ? { ...m, content: m.content + chunk } : m
+            )
+          );
+        },
+        (thinkingChunk: string) => {
+          // Append each thinking chunk
+          setMessages((prev) =>
+            prev.map((m) =>
+              m.id === streamingBotId
+                ? { ...m, thinking: (m.thinking || '') + thinkingChunk }
+                : m
+            )
+          );
+        },
+        () => {
+          // Mark thinking as done
+          setMessages((prev) =>
+            prev.map((m) =>
+              m.id === streamingBotId ? { ...m, isThinkingDone: true } : m
+            )
+          );
+        },
+      );
+
       // Invalidate conversations list cache → Sidebar refetches and shows new title
       queryClient.invalidateQueries({ queryKey: ['conversations'] });
-      console.log('DEBUG: API Response updatedConv:', updatedConv);
 
       if (updatedConv.messages?.length) {
-        console.log('DEBUG: setMessages will run with length:', updatedConv.messages.length);
-        // Replace entire local message array with whatever the backend knows, 
-        // to stay perfectly in sync. Ensure all have string IDs and skipStream for old messages.
+        // Replace entire local message array with the final server state
         setMessages(
           updatedConv.messages.map((m: RawConversationMessage, i: number) => {
             let stableId = m._id || m.id;
 
-            // 1. Force Greeting stability
             if (i === 0) {
               stableId = 'initial-greeting';
-            } 
-            // 2. Try to match the user message we just sent locally
-            else if (m.type === 'user' && m.content === content && i >= updatedConv.messages.length - 2) {
+            } else if (m.type === 'user' && m.content === content && i >= updatedConv.messages.length - 2) {
               stableId = lastUserMsgId;
-            }
-            // 3. Fallback to server ID or new UUID
-            else if (!stableId) {
+            } else if (!stableId) {
               stableId = crypto.randomUUID();
             }
 
             return {
               ...m,
               id: stableId,
-              skipStream: i < updatedConv.messages.length - 1,
+              skipStream: true, // All messages are already shown, no animation needed
             };
           }) as ConvMessage[]
         );
-      } else {
-        console.log('DEBUG: No .messages array found on updatedConv', Object.keys(updatedConv));
       }
     } catch (err) {
       console.error('DEBUG: catch error in handleSend', err);
@@ -216,14 +269,31 @@ export function SetupScreen() {
         {displayedMessages.map((msg, i) => {
           const msgKey = msg.id || `${msg.time}-${msg.type}-${i}`;
           return (
-            <MessageBubble
-              key={msgKey}
-              message={msg}
-              onStartMeeting={handleStartMeeting}
-              onGoToMeeting={(id) => navigateToMeeting(id)}
-              onToggleAgent={handleToggleAgent}
-              meetingCreated={msg.meetingId ? createdMeetings.has(msg.meetingId) : false}
-            />
+            <div key={msgKey}>
+              {msg.thinking && (
+                <div className="px-[22px] mb-1">
+                  <ThinkingBlock thinking={msg.thinking} isDone={msg.isThinkingDone} />
+                </div>
+              )}
+              {msg.type === 'bot' && !msg.content ? (
+                <div className="flex gap-3 px-[22px] py-1 mb-1 animate-msg-in">
+                  <div className="w-7 h-7 rounded-full flex-shrink-0 flex items-center justify-center text-[13px] mt-0.5 bg-gradient-to-br from-accent to-purple">
+                    🧠
+                  </div>
+                  <div className="max-w-[520px]">
+                    <TypingIndicator />
+                  </div>
+                </div>
+              ) : (
+                <MessageBubble
+                  message={msg}
+                  onStartMeeting={handleStartMeeting}
+                  onGoToMeeting={(id) => navigateToMeeting(id)}
+                  onToggleAgent={handleToggleAgent}
+                  meetingCreated={msg.meetingId ? createdMeetings.has(msg.meetingId) : false}
+                />
+              )}
+            </div>
           );
         })}
         {isTyping && <SetupTypingIndicator />}

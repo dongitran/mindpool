@@ -5,7 +5,7 @@ import { api } from '../lib/api';
 export function useSSE(poolId: string | null) {
   const esRef = useRef<EventSource | null>(null);
   const lastTimestampRef = useRef<string | undefined>(undefined);
-  const { addMessage, updateTypingMessage, updateAgentState, updateQueue, setPoolComplete } =
+  const { addMessage, appendChunk, updateTypingMessage, updateAgentState, updateQueue, setPoolComplete } =
     useMeetingStore((s) => s);
 
   useEffect(() => {
@@ -87,6 +87,9 @@ export function useSSE(poolId: string | null) {
               // Primary path: thinking data is now sent directly in agent_message
               updateTypingMessage(data.agentId, data.content, data.thinkSec);
               break;
+            case 'agent_chunk':
+              appendChunk(data.agentId, data.agentName, data.icon, data.chunk);
+              break;
             case 'agent_message':
               addMessage({
                 type: 'agent',
@@ -133,5 +136,5 @@ export function useSSE(poolId: string | null) {
       esRef.current?.close();
       esRef.current = null;
     };
-  }, [poolId, addMessage, updateTypingMessage, updateAgentState, updateQueue, setPoolComplete]);
+  }, [poolId, addMessage, appendChunk, updateTypingMessage, updateAgentState, updateQueue, setPoolComplete]);
 }

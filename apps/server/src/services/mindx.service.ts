@@ -1,6 +1,7 @@
 import type { RouterConfig, ChatMessage } from '@mindpool/shared';
 import { LLMRouter } from '../llm/router';
 import { KimiProvider, MinimaxProvider } from '../llm/providers';
+import { parseSSEStream } from '../llm/stream-parser';
 import { QueueManager } from '../queue/QueueManager';
 import { StopSignalDetector } from '../queue/StopSignalDetector';
 import { config } from '../config';
@@ -296,20 +297,65 @@ export async function handleMeetingLoop(poolId: string): Promise<void> {
 
         try {
           const startTime = Date.now();
-          const result = await withTimeout(
-            llmRouter.agentChat('full_response', chatMessages, { maxTokens: 2048, temperature: 0.7 }),
-            120_000,
-            `full_response for agent ${agentDoc.name}`
+          const STREAM_TIMEOUT_MS = 120_000;
+          const BATCH_INTERVAL_MS = 100;
+          const BATCH_SIZE_CHARS = 50;
+
+          const streamResult = await withTimeout(
+            llmRouter.agentChat('full_response', chatMessages, { maxTokens: 2048, temperature: 0.7, stream: true }),
+            30_000,
+            `stream init for agent ${agentDoc.name}`
           );
 
-          const content = typeof result === 'string' ? result : '';
+          let content: string;
+
+          if (typeof streamResult === 'string') {
+            // Fallback: provider returned full string (non-streaming)
+            content = streamResult;
+          } else {
+            // Stream path: parse SSE chunks and broadcast in batches
+            let accumulated = '';
+            let batchBuffer = '';
+            let lastFlush = Date.now();
+
+            const flushBatch = async () => {
+              if (batchBuffer.length > 0) {
+                await broadcastService.broadcastAgentChunk(
+                  poolId, nextAgentId, agentDoc.name, agentDoc.icon, batchBuffer
+                );
+                batchBuffer = '';
+                lastFlush = Date.now();
+              }
+            };
+
+            try {
+              for await (const delta of parseSSEStream(streamResult)) {
+                if (Date.now() - startTime > STREAM_TIMEOUT_MS) {
+                  logger.warn('Stream timeout, using partial content', { agent: agentDoc.name, poolId });
+                  break;
+                }
+                accumulated += delta;
+                batchBuffer += delta;
+
+                if (batchBuffer.length >= BATCH_SIZE_CHARS || Date.now() - lastFlush >= BATCH_INTERVAL_MS) {
+                  await flushBatch();
+                }
+              }
+              await flushBatch();
+            } catch (streamError) {
+              logger.error('Stream interrupted', { agent: agentDoc.name, poolId, error: streamError });
+              await flushBatch();
+              if (!accumulated) throw streamError;
+            }
+
+            content = accumulated;
+          }
+
           const thinkSec = Math.round((Date.now() - startTime) / 1000);
+          const thinking = `Analyzed context and formulated response about ${agentDoc.specialty}`;
 
           await poolService.addMessage(poolId, { agentId: nextAgentId, content, thinkSec });
 
-          const thinking = `Analyzed context and formulated response about ${agentDoc.specialty}`;
-
-          // Emit the message event (includes thinking data directly — no separate thinking event needed)
           await broadcastService.broadcastAgentMessage(
             poolId,
             nextAgentId,

@@ -51,12 +51,14 @@ function formatTime(ts: string) {
 export function DiscussionFeed({ messages, showThinkingDefault = false }: DiscussionFeedProps) {
   const feedRef = useRef<HTMLDivElement>(null);
 
-  // Scroll to bottom only when a new message arrives or an external push happens
+  // Scroll to bottom when a new message arrives or streaming content updates
+  const lastMsg = messages[messages.length - 1];
+  const scrollTrigger = `${messages.length}-${lastMsg?.content?.length ?? 0}`;
   useEffect(() => {
     if (feedRef.current) {
       feedRef.current.scrollTop = feedRef.current.scrollHeight;
     }
-  }, [messages.length]);
+  }, [scrollTrigger]);
 
   const displayedMessages = useStreamingQueue(messages, 20);
 
@@ -83,6 +85,7 @@ export function DiscussionFeed({ messages, showThinkingDefault = false }: Discus
         }
 
         if (msg.type === 'typing') {
+          const hasStreamContent = msg.content && msg.content.length > 0;
           return (
             <div key={msgKey} className="mb-[18px] animate-msg-in">
               <div className="flex items-center gap-[7px] mb-1.5">
@@ -99,7 +102,16 @@ export function DiscussionFeed({ messages, showThinkingDefault = false }: Discus
                   {formatTime(msg.timestamp)}
                 </div>
               </div>
-              <TypingIndicator />
+              {hasStreamContent ? (
+                <div className="px-4 py-[11px] bg-surface-2 border border-border rounded-[14px] rounded-tl text-[13.5px] leading-relaxed text-text prose prose-invert max-w-none prose-p:my-2 prose-pre:my-3 prose-pre:bg-surface prose-pre:border prose-pre:border-border prose-code:text-[#3DFFC0] prose-code:bg-[rgba(61,255,192,0.1)] prose-code:px-1 prose-code:py-0.5 prose-code:rounded-md prose-code:before:content-none prose-code:after:content-none prose-ul:my-2 prose-li:my-0.5">
+                  <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                    {msg.content}
+                  </ReactMarkdown>
+                  <span className="inline-block w-[2px] h-[14px] bg-accent animate-pulse ml-0.5 align-middle" />
+                </div>
+              ) : (
+                <TypingIndicator />
+              )}
             </div>
           );
         }

@@ -21,10 +21,12 @@ interface MeetingState {
   messages: MeetingMessage[];
   agentStates: Record<string, string>;
   queue: { agentId: string; position: number }[];
+  streamingChunks: Record<string, string>;
   isLoading: boolean;
 
   setCurrentPool: (poolId: string, pool: Pool) => void;
   addMessage: (message: MeetingMessage) => void;
+  appendChunk: (agentId: string, agentName: string, icon: string, chunk: string) => void;
   updateTypingMessage: (agentId: string, thinking: string, thinkSec: number) => void;
   updateAgentState: (agentId: string, state: string) => void;
   updateQueue: (queue: { agentId: string; position: number }[]) => void;
@@ -39,6 +41,7 @@ export const useMeetingStore = create<MeetingState>((set) => ({
   messages: [],
   agentStates: {},
   queue: [],
+  streamingChunks: {},
   isLoading: false,
 
   setCurrentPool: (poolId, pool) =>
@@ -62,12 +65,29 @@ export const useMeetingStore = create<MeetingState>((set) => ({
           msgWithId.icon = msgWithId.icon || typingMsg.icon;
           msgWithId.role = msgWithId.role || typingMsg.role;
         }
+        msgWithId.skipStream = true; // Already streamed in real-time, no fake animation needed
         const filtered = s.messages.filter(
           (m) => !(m.type === 'typing' && m.agentId === msgWithId.agentId)
         );
-        return { messages: [...filtered, msgWithId] };
+        // Clean up streaming chunks for this agent
+        const { [msgWithId.agentId]: _discarded, ...restChunks } = s.streamingChunks;
+        void _discarded;
+        return { messages: [...filtered, msgWithId], streamingChunks: restChunks };
       }
       return { messages: [...s.messages, msgWithId] };
+    }),
+  appendChunk: (agentId, agentName, icon, chunk) =>
+    set((s) => {
+      const prev = s.streamingChunks[agentId] || '';
+      const updated = prev + chunk;
+      return {
+        streamingChunks: { ...s.streamingChunks, [agentId]: updated },
+        messages: s.messages.map((m) =>
+          m.type === 'typing' && m.agentId === agentId
+            ? { ...m, content: updated, agentName: agentName || m.agentName, icon: icon || m.icon }
+            : m
+        ),
+      };
     }),
   updateTypingMessage: (agentId, thinking, thinkSec) =>
     set((s) => ({
@@ -96,6 +116,7 @@ export const useMeetingStore = create<MeetingState>((set) => ({
       messages: [],
       agentStates: {},
       queue: [],
+      streamingChunks: {},
       isLoading: false,
     }),
 }));
