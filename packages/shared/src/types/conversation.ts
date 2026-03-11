@@ -1,6 +1,8 @@
 export type ConversationMessageType = 'bot' | 'user' | 'bot-agents' | 'bot-created';
 
 export interface ConversationAgentSuggestion {
+  id?: string;
+  agentId?: string;
   icon: string;
   name: string;
   desc: string;

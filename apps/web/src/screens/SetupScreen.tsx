@@ -1,5 +1,6 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { useAppStore } from '../stores/appStore';
+import type { ConversationMessage } from '@mindpool/shared';
 import { MessageBubble } from '../components/chat/MessageBubble';
 import { ChatInput } from '../components/chat/ChatInput';
 import { TypingIndicator } from '../components/chat/TypingIndicator';
@@ -7,19 +8,12 @@ import { Tag } from '../components/ui/Tag';
 import { api } from '../lib/api';
 import { useStreamingQueue } from '../hooks/useStreamingQueue';
 
-interface ConvMessage {
-  id?: string;
-  type: 'bot' | 'user' | 'bot-agents' | 'bot-created';
-  time: string;
-  content?: string;
-  intro?: string;
-  agents?: { id?: string; agentId?: string; icon: string; name: string; desc: string; checked: boolean }[];
-  btnId?: string;
-  meetingId?: string;
-  meetingTitle?: string;
-  agentBadges?: string[];
+interface ConvMessage extends ConversationMessage {
+  id: string;
   skipStream?: boolean;
 }
+
+type RawConversationMessage = ConversationMessage & { _id?: string; id?: string };
 
 /** Animated "MindX is typing..." indicator */
 function SetupTypingIndicator() {
@@ -74,7 +68,7 @@ export function SetupScreen() {
       .getConversation(currentConversationId)
       .then((conv) => {
         if (conv.messages?.length) {
-          const historyMsgs = conv.messages.map((m: any, i: number) => ({
+          const historyMsgs = conv.messages.map((m: RawConversationMessage, i: number) => ({
             ...m,
             id: i === 0 ? 'initial-greeting' : (m._id || m.id || crypto.randomUUID()),
             skipStream: true
@@ -96,7 +90,7 @@ export function SetupScreen() {
 
   const displayedMessages = useStreamingQueue(messages, 20);
 
-  const handleSend = async (content: string) => {
+  const handleSend = useCallback(async (content: string) => {
     const userMsg: ConvMessage = { id: crypto.randomUUID(), type: 'user', time: makeTime(), content };
     // Map current messages to skipStream: true immediately to avoid any re-animation while waiting for API
     setMessages((prev) => [
@@ -128,7 +122,7 @@ export function SetupScreen() {
         // Replace entire local message array with whatever the backend knows, 
         // to stay perfectly in sync. Ensure all have string IDs and skipStream for old messages.
         setMessages(
-          updatedConv.messages.map((m: any, i: number) => {
+          updatedConv.messages.map((m: RawConversationMessage, i: number) => {
             let stableId = m._id || m.id;
 
             // 1. Force Greeting stability
@@ -168,7 +162,7 @@ export function SetupScreen() {
     } finally {
       setIsTyping(false);
     }
-  };
+  }, [currentConversationId, setCurrentConversation, setMessages, setIsTyping]);
 
   const handleStartMeeting = async (meetingId: string) => {
     setCreatedMeetings((prev) => new Set(prev).add(meetingId));
@@ -200,7 +194,7 @@ export function SetupScreen() {
       handleSend(initialSetupTopic);
       setInitialSetupTopic(null);
     }
-  }, [initialSetupTopic, messages.length]);
+  }, [initialSetupTopic, messages.length, handleSend, setInitialSetupTopic]);
 
   return (
     <div className="flex-1 flex flex-col overflow-hidden">
