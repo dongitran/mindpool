@@ -98,6 +98,7 @@ export function SetupScreen() {
           const historyMsgs = conv.messages.map((m: RawConversationMessage, i: number) => ({
             ...m,
             id: i === 0 ? 'initial-greeting' : (m._id || m.id || crypto.randomUUID()),
+            isThinkingDone: !!m.thinking,
             skipStream: true
           }));
           setMessages(historyMsgs as ConvMessage[]);
@@ -178,6 +179,24 @@ export function SetupScreen() {
             )
           );
         },
+        (agents) => {
+          // To create a "discovery" effect, we add them one by one mid-stream
+          agents.forEach((agent, index) => {
+            setTimeout(() => {
+              setMessages((prev) =>
+                prev.map((m) =>
+                  m.id === streamingBotId
+                    ? {
+                        ...m,
+                        type: 'bot-agents',
+                        agents: [...(m.agents || []), agent],
+                      }
+                    : m
+                )
+              );
+            }, index * 300); // 300ms delay between each expert appearing
+          });
+        }
       );
 
       // Invalidate conversations list cache → Sidebar refetches and shows new title
@@ -197,9 +216,14 @@ export function SetupScreen() {
               stableId = crypto.randomUUID();
             }
 
+            if (m.type === 'bot-agents' && m.intro) {
+              // Ensure intro flows to UI if content is empty
+            }
+
             return {
               ...m,
               id: stableId,
+              isThinkingDone: !!m.thinking, // If it has thinking in history, it's done
               skipStream: true, // All messages are already shown, no animation needed
             };
           }) as ConvMessage[]
@@ -275,7 +299,7 @@ export function SetupScreen() {
                   <ThinkingBlock thinking={msg.thinking} isDone={msg.isThinkingDone} />
                 </div>
               )}
-              {msg.type === 'bot' && !msg.content ? (
+              {(msg.type === 'bot' || msg.type === 'bot-agents') && !msg.content && !msg.intro && (!msg.agents || msg.agents.length === 0) ? (
                 <div className="flex gap-3 px-[22px] py-1 mb-1 animate-msg-in">
                   <div className="w-7 h-7 rounded-full flex-shrink-0 flex items-center justify-center text-[13px] mt-0.5 bg-gradient-to-br from-accent to-purple">
                     🧠

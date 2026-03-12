@@ -13,6 +13,7 @@ export interface ConversationMessage {
   type: ConversationMessageType;
   time: string;
   content?: string;
+  thinking?: string;
   // bot-agents specific
   intro?: string;
   agents?: ConversationAgentSuggestion[];

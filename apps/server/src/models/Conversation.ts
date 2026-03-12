@@ -9,6 +9,7 @@ const ConversationMessageSchema = new Schema(
     },
     time: { type: String, required: true },
     content: { type: String },
+    thinking: { type: String },
     // bot-agents specific
     intro: { type: String },
     agents: [

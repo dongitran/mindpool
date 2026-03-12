@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { Conversation } from '../models';
+import { Conversation, Agent } from '../models';
 import { llmRouter, analyzeTopicAndSuggestAgents, generateConversationTitle } from '../services/mindx.service';
 import { parseSSEStream } from '../llm/stream-parser';
 import type { ChatMessage } from '@mindpool/shared';
@@ -83,8 +83,10 @@ router.post('/:id/message', validate(sendConversationMessageSchema), async (req,
       minute: '2-digit',
     });
 
-    // Hoist replyContent outside inner try/catch so it's accessible for title generation
+    // Hoist replyContent and thinkingContent outside inner try/catch so it's accessible for persistence
     let replyContent = '';
+    let thinkingContent = '';
+    let lastFlushedCleanLength = 0;
 
     // Add user message
     (conversation.messages as unknown as Array<Record<string, unknown>>).push({
@@ -95,18 +97,33 @@ router.post('/:id/message', validate(sendConversationMessageSchema), async (req,
 
     // Generate MindX reply
     const chatHistory: ChatMessage[] = (
-      conversation.messages as unknown as Array<{ type: string; content?: string }>
+      conversation.messages as unknown as Array<{ type: string; content?: string; agents?: any[] }>
     )
-      .filter((m) => m.content)
+      .filter((m) => m.content || (m.type === 'bot-agents' && m.agents?.length)) // Filter out empty bot messages unless they have agents
       .map((m) => ({
         role: m.type === 'user' ? ('user' as const) : ('assistant' as const),
         content: m.content!,
       }));
 
+    // Prepare agent context for MindX
+    const selectableAgents = await Agent.find({ name: { $ne: 'MindX' } });
+    const agentListStr = selectableAgents
+      .map((a) => `- ${a.name} (Specialty: ${a.specialty}, ID: ${a._id})`)
+      .join('\n');
+
     chatHistory.unshift({
       role: 'system',
       content:
-        'You are MindX, a helpful AI assistant that helps users explore topics by suggesting expert agents for group discussions. Respond in Vietnamese. Be concise and friendly. If the user provides a clear topic that is ready for discussion, include the exact string "[READY]" at the very beginning of your response. When responding with [READY], provide a short encouraging introduction about the topic, but DO NOT list the suggested agents in the text response, as they will be displayed as interactive selection blocks automatically.',
+        'You are MindX, a helpful AI assistant that helps users explore topics by suggesting expert agents for group discussions. Respond in Vietnamese. Be concise and friendly.\n\n' +
+        'CRITICAL: Use your reasoning/thinking block ONLY for internal logic and evaluation. DO NOT draft the final response inside the thinking/reasoning block. ' +
+        'You MUST output your actual final response (starting with the tags below) in the regular content stream after the reasoning phase.\n\n' +
+        'If the user provides a clear topic that is ready for discussion, follow these steps EXACTLY:\n' +
+        '1. Include the exact string "[READY]" at the very beginning of your response.\n' +
+        '2. Choose 3-5 relevant agents from the list below and include their IDs in the format: "[AGENTS: id1, id2, id3]".\n' +
+        '3. Provide a short, encouraging introduction about why you chose these experts.\n\n' +
+        'AVAILABLE AGENTS:\n' +
+        agentListStr +
+        '\n\nDO NOT list the suggested agents by name in the text response, as they will be displayed as interactive selection blocks automatically.',
     });
 
     // Set up SSE streaming headers
@@ -117,7 +134,7 @@ router.post('/:id/message', validate(sendConversationMessageSchema), async (req,
 
     try {
       const streamResult = await llmRouter.agentChat('full_response', chatHistory, {
-        maxTokens: 1024,
+        maxTokens: 4096, // Increased for reasoning models
         temperature: 0.7,
         stream: true,
       });
@@ -133,7 +150,8 @@ router.post('/:id/message', validate(sendConversationMessageSchema), async (req,
         let contentBatch = '';
         let thinkingBatch = '';
         let lastFlush = Date.now();
-        let thinkingContent = '';
+        thinkingContent = '';
+        lastFlushedCleanLength = 0;
 
         const flushBatch = () => {
           if (thinkingBatch.length > 0) {
@@ -147,6 +165,8 @@ router.post('/:id/message', validate(sendConversationMessageSchema), async (req,
           lastFlush = Date.now();
         };
 
+        let hasSuggestedAgents = false;
+
         try {
           for await (const chunk of parseSSEStream(streamResult)) {
             if (chunk.type === 'thinking') {
@@ -154,7 +174,48 @@ router.post('/:id/message', validate(sendConversationMessageSchema), async (req,
               thinkingBatch += chunk.text;
             } else {
               replyContent += chunk.text;
-              contentBatch += chunk.text;
+
+              if (!hasSuggestedAgents) {
+                // Detective [READY] mid-stream to suggest agents immediately
+                if (replyContent.includes('[AGENTS:')) {
+                  const match = replyContent.match(/\[AGENTS:\s*([^\]]+)\]/);
+                  if (match) {
+                    hasSuggestedAgents = true;
+                    const agentIds = match[1].split(',').map((id) => id.trim());
+
+                    Agent.find({ _id: { $in: agentIds } })
+                      .then((foundAgents) => {
+                        const suggestions = foundAgents.map((a) => ({
+                          agentId: a._id.toString(),
+                          icon: a.icon,
+                          name: a.name,
+                          desc: a.specialty,
+                          checked: true,
+                        }));
+                        res.write(`data: ${JSON.stringify({ type: 'agents_suggested', agents: suggestions })}\n\n`);
+                      })
+                      .catch((err) => logger.error('Async agent suggestion failed', { error: err }));
+                  }
+                }
+              }
+
+              // Robust streaming: Clean all tags and stream the new content delta
+              const getCleanText = (raw: string) => {
+                let clean = raw.replace(/\[READY\]/g, '').replace(/\[AGENTS:[^\]]*\]/g, '');
+                // Also hide partial tags at the end
+                const bracketIdx = clean.lastIndexOf('[');
+                if (bracketIdx !== -1 && !clean.slice(bracketIdx).includes(']')) {
+                  clean = clean.slice(0, bracketIdx);
+                }
+                return clean.trimStart();
+              };
+
+              const currentClean = getCleanText(replyContent);
+              if (currentClean.length > lastFlushedCleanLength) {
+                const delta = currentClean.slice(lastFlushedCleanLength);
+                contentBatch += delta;
+                lastFlushedCleanLength = currentClean.length;
+              }
             }
 
             const totalBatch = contentBatch.length + thinkingBatch.length;
@@ -178,9 +239,14 @@ router.post('/:id/message', validate(sendConversationMessageSchema), async (req,
 
       let isReady = false;
 
+      let results: any[] = [];
+      const agentMatch = replyContent.match(/\[AGENTS:\s*([^\]]+)\]/);
+      
       if (replyContent.includes('[READY]')) {
         isReady = true;
-        replyContent = replyContent.replace('[READY]', '').trim();
+        // Clean up tags for UI display
+        replyContent = replyContent.replace(/\[READY\]/g, '').trim();
+        replyContent = replyContent.replace(/\[AGENTS:[^\]]+\]/g, '').trim();
         replyContent = replyContent.replace(/^[\r\n]+/, '');
       }
 
@@ -190,21 +256,44 @@ router.post('/:id/message', validate(sendConversationMessageSchema), async (req,
       });
 
       if (isReady) {
-        const topic = content;
-        const suggestions = await analyzeTopicAndSuggestAgents(topic);
+        if (agentMatch) {
+          const ids = agentMatch[1].split(',').map(id => id.trim());
+          const found = await Agent.find({ _id: { $in: ids } });
+          results = found.map(a => ({
+            agentId: a._id.toString(),
+            icon: a.icon,
+            name: a.name,
+            desc: a.specialty,
+            checked: true,
+          }));
+        }
+
+        // If no experts found via tags, fallback to automatic selection
+        if (results.length === 0) {
+          results = await analyzeTopicAndSuggestAgents(content);
+        }
+
+        // Clean final content for storage
+        let cleanContent = replyContent.replace(/\[READY\]/g, '').replace(/\[AGENTS:[^\]]*\]/g, '').trim();
+        
+        if (isReady && !cleanContent) {
+          cleanContent = 'Dưới đây là một số chuyên gia tôi đề xuất cho cuộc thảo luận của bạn:';
+        }
 
         (conversation.messages as unknown as Array<Record<string, unknown>>).push({
           type: 'bot-agents',
           time: replyTime,
-          intro: replyContent,
-          agents: suggestions,
+          intro: cleanContent,
+          agents: results,
+          thinking: thinkingContent,
           btnId: `start-btn-${conversation._id}`,
         });
       } else {
         (conversation.messages as unknown as Array<Record<string, unknown>>).push({
           type: 'bot',
           time: replyTime,
-          content: replyContent,
+          content: replyContent.trim(),
+          thinking: thinkingContent,
         });
       }
     } catch (llmError) {

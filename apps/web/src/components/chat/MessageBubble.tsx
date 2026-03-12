@@ -81,11 +81,13 @@ export function MessageBubble({
           🧠
         </div>
         <div className="max-w-[520px]">
-          <div className="px-[15px] py-[11px] rounded-[14px] rounded-tl-[4px] bg-surface-2 border border-border text-text text-[13.5px] leading-[1.65] prose prose-invert max-w-none prose-p:leading-relaxed prose-pre:bg-surface-3 prose-pre:border prose-pre:border-border-light prose-sm">
-            <ReactMarkdown remarkPlugins={[remarkGfm]}>
-              {sanitizeMarkdown(message.intro)}
-            </ReactMarkdown>
-          </div>
+          {(message.intro || message.content) && (
+            <div className="px-[15px] py-[11px] rounded-[14px] rounded-tl-[4px] bg-surface-2 border border-border text-text text-[13.5px] leading-[1.65] prose prose-invert max-w-none prose-p:leading-relaxed prose-pre:bg-surface-3 prose-pre:border prose-pre:border-border-light prose-sm">
+              <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                {sanitizeMarkdown(message.intro || message.content)}
+              </ReactMarkdown>
+            </div>
+          )}
           <AgentSuggestion
             agents={message.agents || []}
             meetingId={message.meetingId || ''}

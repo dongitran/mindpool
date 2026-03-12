@@ -30,6 +30,7 @@ export const api = {
     onChunk: (chunk: string) => void,
     onThinkingChunk?: (chunk: string) => void,
     onThinkingDone?: () => void,
+    onAgents?: (agents: any[]) => void,
   ): Promise<Conversation> => {
     const res = await fetch(`${API_BASE}/conversations/${id}/message`, {
       method: 'POST',
@@ -63,6 +64,8 @@ export const api = {
             onThinkingChunk?.(data.content);
           } else if (data.type === 'thinking_done') {
             onThinkingDone?.();
+          } else if (data.type === 'agents_suggested') {
+            onAgents?.(data.agents);
           } else if (data.type === 'done') {
             finalConversation = data.conversation as Conversation;
           }

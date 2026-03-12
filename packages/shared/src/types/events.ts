@@ -8,4 +8,5 @@ export type SSEEvent =
   | { type: 'queue_update'; queue: { agentId: string; position: number }[] }
   | { type: 'agent_state'; agentId: string; state: 'speaking' | 'queued' | 'listening' | 'moderating' }
   | { type: 'pool_complete'; wrapUp: string; status: 'completed' }
+  | { type: 'agents_suggested'; agents: any[] }
   | { type: 'error'; message: string };

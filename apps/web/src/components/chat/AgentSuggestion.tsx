@@ -1,3 +1,5 @@
+import { motion, AnimatePresence } from 'framer-motion';
+
 interface Agent {
   id?: string;
   agentId?: string;
@@ -25,38 +27,43 @@ export function AgentSuggestion({
 }: AgentSuggestionProps) {
   return (
     <div className="mt-4 flex flex-col gap-2">
-      {agents
-        .filter((a) => a.name !== 'MindX')
-        .map((agent, i) => (
-          <div
-            key={i}
-            onClick={() => onToggle(agent.agentId || agent.id || agent.name)}
-            className={`flex items-center gap-4 p-4 rounded-xl border transition-all cursor-pointer hover:border-[rgba(61,255,192,0.4)] ${
-              agent.checked
-                ? 'bg-accent/10 border-accent/30'
-                : 'bg-surface-3 border-white/5'
-            }`}
-          >
-            <div
-              className={`w-6 h-6 rounded-md border-2 flex items-center justify-center text-sm flex-shrink-0 transition-all ${
+      <AnimatePresence>
+        {agents
+          .filter((a) => a.name !== 'MindX')
+          .map((agent) => (
+            <motion.div
+              key={agent.agentId || agent.id || agent.name}
+              initial={{ opacity: 0, y: 15 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.4, ease: 'easeOut' }}
+              onClick={() => onToggle(agent.agentId || agent.id || agent.name)}
+              className={`flex items-center gap-4 p-4 rounded-xl border transition-all cursor-pointer hover:border-[rgba(61,255,192,0.4)] ${
                 agent.checked
-                  ? 'bg-accent border-accent text-bg'
-                  : 'border-white/10'
+                  ? 'bg-accent/10 border-accent/30'
+                  : 'bg-surface-3 border-white/5'
               }`}
             >
-              {agent.checked ? '✓' : ''}
-            </div>
-            <div className="text-2xl">{agent.icon}</div>
-            <div className="flex-1">
-              <div className="text-[15px] font-bold text-text mb-0.5">
-                {agent.name}
+              <div
+                className={`w-6 h-6 rounded-md border-2 flex items-center justify-center text-sm flex-shrink-0 transition-all ${
+                  agent.checked
+                    ? 'bg-accent border-accent text-bg'
+                    : 'border-white/10'
+                }`}
+              >
+                {agent.checked ? '✓' : ''}
               </div>
-              <div className="text-[13px] text-text-muted leading-tight">
-                {agent.desc}
+              <div className="text-2xl">{agent.icon}</div>
+              <div className="flex-1">
+                <div className="text-[15px] font-bold text-text mb-0.5">
+                  {agent.name}
+                </div>
+                <div className="text-[13px] text-text-muted leading-tight">
+                  {agent.desc}
+                </div>
               </div>
-            </div>
-          </div>
-        ))}
+            </motion.div>
+          ))}
+      </AnimatePresence>
 
       {meetingCreated ? (
         <button
