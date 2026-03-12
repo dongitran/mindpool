@@ -97,7 +97,7 @@ router.post('/:id/message', validate(sendConversationMessageSchema), async (req,
 
     // Generate MindX reply
     const chatHistory: ChatMessage[] = (
-      conversation.messages as unknown as Array<{ type: string; content?: string; agents?: any[] }>
+      conversation.messages as unknown as Array<{ type: string; content?: string; agents?: { name: string }[] }>
     )
       .filter((m) => m.content || (m.type === 'bot-agents' && m.agents?.length)) // Filter out empty bot messages unless they have agents
       .map((m) => ({
@@ -239,7 +239,7 @@ router.post('/:id/message', validate(sendConversationMessageSchema), async (req,
 
       let isReady = false;
 
-      let results: any[] = [];
+      let results: { agentId: string; icon: string; name: string; desc: string; checked: boolean }[] = [];
       const agentMatch = replyContent.match(/\[AGENTS:\s*([^\]]+)\]/);
       
       if (replyContent.includes('[READY]')) {

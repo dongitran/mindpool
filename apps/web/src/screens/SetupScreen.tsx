@@ -243,7 +243,7 @@ export function SetupScreen() {
     } finally {
       setIsTyping(false);
     }
-  }, [currentConversationId, setCurrentConversation, setMessages, setIsTyping]);
+  }, [currentConversationId, setCurrentConversation, setMessages, setIsTyping, queryClient]);
 
   const handleStartMeeting = async (meetingId: string) => {
     setCreatedMeetings((prev) => new Set(prev).add(meetingId));

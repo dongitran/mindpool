@@ -1,3 +1,5 @@
+import type { ConversationAgentSuggestion } from './conversation';
+
 export type SSEEvent =
   | { type: 'mindx_announce'; content: string }
   | { type: 'agent_typing'; agentId: string; agentName: string; icon: string; role: string }
@@ -8,5 +10,5 @@ export type SSEEvent =
   | { type: 'queue_update'; queue: { agentId: string; position: number }[] }
   | { type: 'agent_state'; agentId: string; state: 'speaking' | 'queued' | 'listening' | 'moderating' }
   | { type: 'pool_complete'; wrapUp: string; status: 'completed' }
-  | { type: 'agents_suggested'; agents: any[] }
+  | { type: 'agents_suggested'; agents: ConversationAgentSuggestion[] }
   | { type: 'error'; message: string };

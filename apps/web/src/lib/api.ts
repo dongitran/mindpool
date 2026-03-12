@@ -1,4 +1,4 @@
-import type { Pool, Conversation } from '@mindpool/shared';
+import type { Pool, Conversation, ConversationAgentSuggestion } from '@mindpool/shared';
 
 const API_BASE = '/api';
 
@@ -30,7 +30,7 @@ export const api = {
     onChunk: (chunk: string) => void,
     onThinkingChunk?: (chunk: string) => void,
     onThinkingDone?: () => void,
-    onAgents?: (agents: any[]) => void,
+    onAgents?: (agents: ConversationAgentSuggestion[]) => void,
   ): Promise<Conversation> => {
     const res = await fetch(`${API_BASE}/conversations/${id}/message`, {
       method: 'POST',
