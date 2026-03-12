@@ -41,6 +41,9 @@ vi.mock('../../models', () => ({
       }),
     }),
   },
+  Agent: {
+    find: vi.fn().mockResolvedValue([]),
+  },
 }));
 
 import request from 'supertest';
