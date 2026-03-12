@@ -89,6 +89,8 @@
     "hset",
     "HSET",
     "ciphertexts",
-    "refetches"
+    "refetches",
+    "buildx",
+    "Buildx"
   ]
 }

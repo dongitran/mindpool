@@ -1,6 +1,7 @@
 name: Deploy
 
 on:
+  workflow_dispatch:
   push:
     branches: [master]
     paths:
@@ -11,6 +12,7 @@ on:
       - 'apps/**/*.css'
       - 'apps/**/Dockerfile'
       - 'apps/**/nginx*.conf'
+      - 'e2e/**'
       - 'infra/**'
       - 'pnpm-lock.yaml'
       - '.github/workflows/deploy.yml'
