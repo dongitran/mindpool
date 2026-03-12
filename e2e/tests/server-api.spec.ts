@@ -1,5 +1,26 @@
 import { test, expect } from '@playwright/test';
 
+/** Parse an SSE text body and return the data from the last 'done' event */
+function parseSSEResponse(body: string): any {
+  const lines = body.split('\n');
+  let lastDoneData: any = null;
+
+  for (const line of lines) {
+    if (line.startsWith('data: ')) {
+      try {
+        const parsed = JSON.parse(line.slice(6));
+        if (parsed.type === 'done' && parsed.conversation) {
+          lastDoneData = parsed.conversation;
+        }
+      } catch {
+        // skip non-JSON lines
+      }
+    }
+  }
+
+  return lastDoneData;
+}
+
 test.describe.serial('Server API Endpoints', () => {
   let conversationId: string;
   let poolId: string;
@@ -29,7 +50,11 @@ test.describe.serial('Server API Endpoints', () => {
     });
     
     expect(response.ok()).toBeTruthy();
-    const data = await response.json();
+
+    // Response is now SSE stream — parse the 'done' event to get conversation
+    const body = await response.text();
+    const data = parseSSEResponse(body);
+    expect(data).not.toBeNull();
     expect(data).toHaveProperty('messages');
     
     // Find the bot-agents message which indicates LLM analyzed and returned agent suggestions
@@ -59,7 +84,11 @@ test.describe.serial('Server API Endpoints', () => {
       data: { content: 'I want to analyze machine learning deployment strategies for production systems' }
     });
     expect(msgRes.ok()).toBeTruthy();
-    const updated = await msgRes.json();
+
+    // Response is now SSE stream — parse the 'done' event to get updated conversation
+    const body = await msgRes.text();
+    const updated = parseSSEResponse(body);
+    expect(updated).not.toBeNull();
 
     // Title should have been generated (not default)
     // Note: LLM might return NONE for very vague messages, but this topic is specific enough
