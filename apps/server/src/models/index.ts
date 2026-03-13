@@ -12,3 +12,7 @@ export type { ConversationDocument } from './Conversation';
 
 export { Settings, maskApiKey, encryptApiKey } from './Settings';
 export type { SettingsDocument } from './Settings';
+
+export { LLMLog } from './LLMLog';
+export type { LLMLogDocument } from './LLMLog';
+

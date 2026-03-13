@@ -1,5 +1,6 @@
 import type { CallType, ChatMessage, ChatOptions, RouterConfig } from '@mindpool/shared';
 import type { LLMProvider } from './types';
+import { saveLLMLog, createLoggingStream } from './logging-stream';
 
 export class LLMRouter {
   private providers = new Map<string, LLMProvider>();
@@ -30,7 +31,31 @@ export class LLMRouter {
       );
     }
 
-    return provider.chat(messages, routeConfig.model, options);
+    const logCtx = {
+      callType,
+      provider: routeConfig.provider,
+      llmModel: routeConfig.model,
+      messages: messages.map((m) => ({ role: m.role, content: m.content })),
+      options: options ? { maxTokens: options.maxTokens, temperature: options.temperature, stream: options.stream } : {},
+      startTime: Date.now(),
+    };
+
+    try {
+      const result = await provider.chat(messages, routeConfig.model, options);
+
+      if (typeof result === 'string') {
+        // Non-streaming: log immediately (fire-and-forget)
+        saveLLMLog(logCtx, result, null, null);
+        return result;
+      }
+
+      // Streaming: wrap with logging pass-through
+      return createLoggingStream(result, logCtx);
+    } catch (error) {
+      // Log failed calls too
+      saveLLMLog(logCtx, '', null, error instanceof Error ? error.message : String(error));
+      throw error;
+    }
   }
 
   updateConfig(newConfig: Partial<RouterConfig>): void {
@@ -41,3 +66,4 @@ export class LLMRouter {
     return structuredClone(this.config);
   }
 }
+

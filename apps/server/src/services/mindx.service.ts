@@ -334,8 +334,11 @@ export async function handleMeetingLoop(poolId: string): Promise<void> {
                   logger.warn('Stream timeout, using partial content', { agent: agentDoc.name, poolId });
                   break;
                 }
-                accumulated += delta;
-                batchBuffer += delta;
+                // Only accumulate content chunks; skip thinking/reasoning chunks
+                if (delta.type === 'content') {
+                  accumulated += delta.text;
+                  batchBuffer += delta.text;
+                }
 
                 if (batchBuffer.length >= BATCH_SIZE_CHARS || Date.now() - lastFlush >= BATCH_INTERVAL_MS) {
                   await flushBatch();
