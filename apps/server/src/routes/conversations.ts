@@ -16,10 +16,7 @@ const router = Router();
 router.post('/', validate(createConversationSchema), async (req, res, next) => {
   try {
     const { title } = req.body;
-    const now = new Date().toLocaleTimeString('vi-VN', {
-      hour: '2-digit',
-      minute: '2-digit',
-    });
+    const now = new Date().toISOString();
 
     const conversation = await Conversation.create({
       title: title || 'Cuộc trò chuyện mới',
@@ -78,10 +75,7 @@ router.post('/:id/message', validate(sendConversationMessageSchema), async (req,
     const needsTitle = conversation.title === 'Cuộc trò chuyện mới';
 
     const { content } = req.body;
-    const now = new Date().toLocaleTimeString('vi-VN', {
-      hour: '2-digit',
-      minute: '2-digit',
-    });
+    const now = new Date().toISOString();
 
     // Hoist replyContent and thinkingContent outside inner try/catch so it's accessible for persistence
     let replyContent = '';
@@ -266,10 +260,7 @@ router.post('/:id/message', validate(sendConversationMessageSchema), async (req,
         replyContent = replyContent.replace(/^[\r\n]+/, '');
       }
 
-      const replyTime = new Date().toLocaleTimeString('vi-VN', {
-        hour: '2-digit',
-        minute: '2-digit',
-      });
+      const replyTime = new Date().toISOString();
 
       if (isReady) {
         // Prefer individual [AGENT:] tags, fallback to legacy [AGENTS:] format
@@ -320,10 +311,7 @@ router.post('/:id/message', validate(sendConversationMessageSchema), async (req,
       }
     } catch (llmError) {
       logger.error('LLM error in conversation', { error: llmError });
-      const replyTime = new Date().toLocaleTimeString('vi-VN', {
-        hour: '2-digit',
-        minute: '2-digit',
-      });
+      const replyTime = new Date().toISOString();
       (conversation.messages as unknown as Array<Record<string, unknown>>).push({
         type: 'bot',
         time: replyTime,

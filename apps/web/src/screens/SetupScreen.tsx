@@ -56,8 +56,7 @@ function ThinkingBlock({ thinking, isDone }: { thinking: string; isDone?: boolea
 }
 
 
-const makeTime = () =>
-  new Date().toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true });
+const makeTime = () => new Date().toISOString();
 
 const GREETING: ConvMessage = {
   id: 'initial-greeting',

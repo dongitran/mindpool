@@ -11,6 +11,15 @@ const sanitizeMarkdown = (text?: string) => {
     .replace(/<br\s*\/?>/g, '\n');
 };
 
+// Format time for display — handles ISO strings (new) and legacy 'HH:mm' (old DB data)
+const formatTime = (time: string) => {
+  const date = new Date(time);
+  if (!isNaN(date.getTime()) && time.length > 5) {
+    return date.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit', hour12: true });
+  }
+  return time; // Legacy "HH:mm" format — return as-is
+};
+
 interface MessageProps {
   message: {
     type: 'bot' | 'user' | 'bot-agents' | 'bot-created';
@@ -44,7 +53,7 @@ export function MessageBubble({
             {message.content}
           </div>
           <div className="text-[10px] text-text-dim mt-1 px-1 text-right">
-            {message.time}
+            {formatTime(message.time)}
           </div>
         </div>
         <div className="w-7 h-7 rounded-full flex-shrink-0 flex items-center justify-center text-[10px] font-bold bg-surface-3 border border-border-light text-text-muted mt-0.5">
@@ -67,7 +76,7 @@ export function MessageBubble({
             </ReactMarkdown>
           </div>
           <div className="text-[10px] text-text-dim mt-1 px-1">
-            {message.time}
+            {formatTime(message.time)}
           </div>
         </div>
       </div>
@@ -97,7 +106,7 @@ export function MessageBubble({
             onGoto={() => onGoToMeeting?.(message.meetingId || '')}
           />
           <div className="text-[10px] text-text-dim mt-1 px-1">
-            {message.time}
+            {formatTime(message.time)}
           </div>
         </div>
       </div>
@@ -139,7 +148,7 @@ export function MessageBubble({
             </button>
           </div>
           <div className="text-[10px] text-text-dim mt-1 px-1">
-            {message.time}
+            {formatTime(message.time)}
           </div>
         </div>
       </div>
