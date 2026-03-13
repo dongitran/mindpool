@@ -119,8 +119,10 @@ router.post('/:id/message', validate(sendConversationMessageSchema), async (req,
         'You MUST output your actual final response (starting with the tags below) in the regular content stream after the reasoning phase.\n\n' +
         'If the user provides a clear topic that is ready for discussion, follow these steps EXACTLY:\n' +
         '1. Include the exact string "[READY]" at the very beginning of your response.\n' +
-        '2. Choose 3-5 relevant agents from the list below and include their IDs in the format: "[AGENTS: id1, id2, id3]".\n' +
-        '3. Provide a short, encouraging introduction about why you chose these experts.\n\n' +
+        '2. Provide a short, encouraging introduction about why you chose these experts.\n' +
+        '3. After the introduction text, list each chosen agent on its own line using the format [AGENT: agentId]. Example:\n' +
+        '[AGENT: 69b1152123f25e5c560a7465]\n' +
+        '[AGENT: 69b1152123f25e5c560a7468]\n\n' +
         'AVAILABLE AGENTS:\n' +
         agentListStr +
         '\n\nDO NOT list the suggested agents by name in the text response, as they will be displayed as interactive selection blocks automatically.',
@@ -165,7 +167,7 @@ router.post('/:id/message', validate(sendConversationMessageSchema), async (req,
           lastFlush = Date.now();
         };
 
-        let hasSuggestedAgents = false;
+        const sentAgentIds = new Set<string>();
 
         try {
           for await (const chunk of parseSSEStream(streamResult)) {
@@ -175,33 +177,34 @@ router.post('/:id/message', validate(sendConversationMessageSchema), async (req,
             } else {
               replyContent += chunk.text;
 
-              if (!hasSuggestedAgents) {
-                // Detective [READY] mid-stream to suggest agents immediately
-                if (replyContent.includes('[AGENTS:')) {
-                  const match = replyContent.match(/\[AGENTS:\s*([^\]]+)\]/);
-                  if (match) {
-                    hasSuggestedAgents = true;
-                    const agentIds = match[1].split(',').map((id) => id.trim());
-
-                    Agent.find({ _id: { $in: agentIds } })
-                      .then((foundAgents) => {
-                        const suggestions = foundAgents.map((a) => ({
-                          agentId: a._id.toString(),
-                          icon: a.icon,
-                          name: a.name,
-                          desc: a.specialty,
-                          checked: true,
-                        }));
-                        res.write(`data: ${JSON.stringify({ type: 'agents_suggested', agents: suggestions })}\n\n`);
-                      })
-                      .catch((err) => logger.error('Async agent suggestion failed', { error: err }));
+              // Detect individual [AGENT: id] tags progressively
+              const agentTagMatches = replyContent.matchAll(/\[AGENT:\s*([^\]]+)\]/g);
+              for (const agentTagMatch of agentTagMatches) {
+                const agentId = agentTagMatch[1].trim();
+                if (sentAgentIds.has(agentId)) continue;
+                sentAgentIds.add(agentId);
+                try {
+                  const foundAgent = await Agent.findById(agentId);
+                  if (foundAgent) {
+                    res.write(`data: ${JSON.stringify({
+                      type: 'agents_suggested',
+                      agents: [{
+                        agentId: foundAgent._id.toString(),
+                        icon: foundAgent.icon,
+                        name: foundAgent.name,
+                        desc: foundAgent.specialty,
+                        checked: true,
+                      }],
+                    })}\n\n`);
                   }
+                } catch (err) {
+                  logger.error('Agent suggestion lookup failed', { error: err, agentId });
                 }
               }
 
               // Robust streaming: Clean all tags and stream the new content delta
               const getCleanText = (raw: string) => {
-                let clean = raw.replace(/\[READY\]/g, '').replace(/\[AGENTS:[^\]]*\]/g, '');
+                let clean = raw.replace(/\[READY\]/g, '').replace(/\[AGENTS:[^\]]*\]/g, '').replace(/\[AGENT:[^\]]*\]/g, '');
                 // Also hide partial tags at the end
                 const bracketIdx = clean.lastIndexOf('[');
                 if (bracketIdx !== -1 && !clean.slice(bracketIdx).includes(']')) {
@@ -240,13 +243,17 @@ router.post('/:id/message', validate(sendConversationMessageSchema), async (req,
       let isReady = false;
 
       let results: { agentId: string; icon: string; name: string; desc: string; checked: boolean }[] = [];
-      const agentMatch = replyContent.match(/\[AGENTS:\s*([^\]]+)\]/);
+      // Collect all individual [AGENT: id] tags
+      const allAgentIds = [...replyContent.matchAll(/\[AGENT:\s*([^\]]+)\]/g)].map(m => m[1].trim());
+      // Also support legacy [AGENTS: id1, id2] format
+      const legacyAgentMatch = replyContent.match(/\[AGENTS:\s*([^\]]+)\]/);
       
       if (replyContent.includes('[READY]')) {
         isReady = true;
         // Clean up tags for UI display
         replyContent = replyContent.replace(/\[READY\]/g, '').trim();
         replyContent = replyContent.replace(/\[AGENTS:[^\]]+\]/g, '').trim();
+        replyContent = replyContent.replace(/\[AGENT:[^\]]*\]/g, '').trim();
         replyContent = replyContent.replace(/^[\r\n]+/, '');
       }
 
@@ -256,9 +263,15 @@ router.post('/:id/message', validate(sendConversationMessageSchema), async (req,
       });
 
       if (isReady) {
-        if (agentMatch) {
-          const ids = agentMatch[1].split(',').map(id => id.trim());
-          const found = await Agent.find({ _id: { $in: ids } });
+        // Prefer individual [AGENT:] tags, fallback to legacy [AGENTS:] format
+        const idsToFind = allAgentIds.length > 0
+          ? allAgentIds
+          : legacyAgentMatch
+            ? legacyAgentMatch[1].split(',').map(id => id.trim())
+            : [];
+
+        if (idsToFind.length > 0) {
+          const found = await Agent.find({ _id: { $in: idsToFind } });
           results = found.map(a => ({
             agentId: a._id.toString(),
             icon: a.icon,

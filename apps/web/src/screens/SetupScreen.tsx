@@ -180,21 +180,19 @@ export function SetupScreen() {
           );
         },
         (agents) => {
-          // To create a "discovery" effect, we add them one by one mid-stream
-          agents.forEach((agent, index) => {
-            setTimeout(() => {
-              setMessages((prev) =>
-                prev.map((m) =>
-                  m.id === streamingBotId
-                    ? {
-                        ...m,
-                        type: 'bot-agents',
-                        agents: [...(m.agents || []), agent],
-                      }
-                    : m
-                )
-              );
-            }, index * 300); // 300ms delay between each expert appearing
+          // Agents arrive one at a time from SSE — append each directly
+          agents.forEach((agent) => {
+            setMessages((prev) =>
+              prev.map((m) =>
+                m.id === streamingBotId
+                  ? {
+                      ...m,
+                      type: 'bot-agents',
+                      agents: [...(m.agents || []), agent],
+                    }
+                  : m
+              )
+            );
           });
         }
       );
