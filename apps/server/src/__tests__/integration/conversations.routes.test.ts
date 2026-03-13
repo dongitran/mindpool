@@ -5,7 +5,7 @@ process.env.MONGO_URI = 'mongodb://localhost/test';
 process.env.REDIS_URL = 'redis://localhost:6379';
 process.env.ENCRYPTION_KEY = 'test_encryption_key_32_bytes_long_123';
 
-const { mockConversation, mockGenerateTitle, mockSuggestAgents, mockLlmChat } = vi.hoisted(() => {
+const { mockConversation, mockGenerateTitle, mockSuggestAgents, mockLlmChat, mockFindByIdAndUpdate } = vi.hoisted(() => {
   const mockSave = vi.fn();
   const mockConversation = {
     title: 'Cuộc trò chuyện mới',
@@ -18,6 +18,10 @@ const { mockConversation, mockGenerateTitle, mockSuggestAgents, mockLlmChat } = 
     mockGenerateTitle: vi.fn(),
     mockSuggestAgents: vi.fn().mockResolvedValue([]),
     mockLlmChat: vi.fn(),
+    mockFindByIdAndUpdate: vi.fn().mockImplementation((_id: string, update: Record<string, unknown>) => {
+      if (update.title) mockConversation.title = update.title as string;
+      return Promise.resolve(null);
+    }),
   };
 });
 
@@ -34,6 +38,7 @@ vi.mock('../../lib/logger', () => ({
 vi.mock('../../models', () => ({
   Conversation: {
     findById: vi.fn().mockResolvedValue(mockConversation),
+    findByIdAndUpdate: mockFindByIdAndUpdate,
     create: vi.fn().mockResolvedValue(mockConversation),
     find: vi.fn().mockReturnValue({
       sort: vi.fn().mockReturnValue({
@@ -79,7 +84,10 @@ describe('POST /conversations/:id/message — title generation', () => {
       'Analyze AI strategy for startups',
       expect.any(String)
     );
-    expect(mockConversation.title).toBe('AI Startup Strategy');
+    // Title is updated via fire-and-forget findByIdAndUpdate
+    await vi.waitFor(() => {
+      expect(mockFindByIdAndUpdate).toHaveBeenCalledWith('conv-1', { title: 'AI Startup Strategy' });
+    });
     expect(mockConversation.save).toHaveBeenCalled();
   });
 
@@ -156,8 +164,10 @@ describe('POST /conversations/:id/message — title generation', () => {
       .send({ content: 'Analyze AI strategy for startups' })
       .expect(200);
 
-    expect(mockGenerateTitle).toHaveBeenCalledTimes(1);
-    expect(mockConversation.title).toBe('AI Strategy Discussion');
+    // Title is updated via fire-and-forget findByIdAndUpdate
+    await vi.waitFor(() => {
+      expect(mockFindByIdAndUpdate).toHaveBeenCalledWith('conv-1', { title: 'AI Strategy Discussion' });
+    });
   });
 
   it('should stop calling generateTitle after title is set', async () => {
@@ -170,7 +180,9 @@ describe('POST /conversations/:id/message — title generation', () => {
       .send({ content: 'ML deployment' })
       .expect(200);
 
-    expect(mockConversation.title).toBe('ML Deployment Strategies');
+    await vi.waitFor(() => {
+      expect(mockFindByIdAndUpdate).toHaveBeenCalledWith('conv-1', { title: 'ML Deployment Strategies' });
+    });
 
     // Exchange 2: title already set → should NOT call generateTitle
     vi.clearAllMocks();

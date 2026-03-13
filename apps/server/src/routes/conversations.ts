@@ -134,6 +134,15 @@ router.post('/:id/message', validate(sendConversationMessageSchema), async (req,
     res.setHeader('Connection', 'keep-alive');
     res.setHeader('X-Accel-Buffering', 'no');
 
+    // Track client disconnect — SSE writes become no-ops after disconnect
+    let clientDisconnected = false;
+    res.on('close', () => { clientDisconnected = true; });
+
+    const safeWrite = (data: string) => {
+      if (clientDisconnected) return;
+      try { res.write(data); } catch { clientDisconnected = true; }
+    };
+
     try {
       const streamResult = await llmRouter.agentChat('full_response', chatHistory, {
         maxTokens: 4096, // Increased for reasoning models
@@ -144,7 +153,7 @@ router.post('/:id/message', validate(sendConversationMessageSchema), async (req,
       if (typeof streamResult === 'string') {
         // Non-streaming fallback
         replyContent = streamResult || 'Tôi hiểu. Bạn muốn tìm hiểu thêm không?';
-        res.write(`data: ${JSON.stringify({ type: 'chunk', content: replyContent })}\n\n`);
+        safeWrite(`data: ${JSON.stringify({ type: 'chunk', content: replyContent })}\n\n`);
       } else {
         // Stream chunks to client
         const BATCH_INTERVAL_MS = 80;
@@ -157,11 +166,11 @@ router.post('/:id/message', validate(sendConversationMessageSchema), async (req,
 
         const flushBatch = () => {
           if (thinkingBatch.length > 0) {
-            res.write(`data: ${JSON.stringify({ type: 'thinking_chunk', content: thinkingBatch })}\n\n`);
+            safeWrite(`data: ${JSON.stringify({ type: 'thinking_chunk', content: thinkingBatch })}\n\n`);
             thinkingBatch = '';
           }
           if (contentBatch.length > 0) {
-            res.write(`data: ${JSON.stringify({ type: 'chunk', content: contentBatch })}\n\n`);
+            safeWrite(`data: ${JSON.stringify({ type: 'chunk', content: contentBatch })}\n\n`);
             contentBatch = '';
           }
           lastFlush = Date.now();
@@ -186,7 +195,7 @@ router.post('/:id/message', validate(sendConversationMessageSchema), async (req,
                 try {
                   const foundAgent = await Agent.findById(agentId);
                   if (foundAgent) {
-                    res.write(`data: ${JSON.stringify({
+                    safeWrite(`data: ${JSON.stringify({
                       type: 'agents_suggested',
                       agents: [{
                         agentId: foundAgent._id.toString(),
@@ -229,7 +238,7 @@ router.post('/:id/message', validate(sendConversationMessageSchema), async (req,
           flushBatch();
           // Send thinking_done so frontend knows thinking is complete (with elapsed time placeholder)
           if (thinkingContent) {
-            res.write(`data: ${JSON.stringify({ type: 'thinking_done' })}\n\n`);
+            safeWrite(`data: ${JSON.stringify({ type: 'thinking_done' })}\n\n`);
           }
         } catch (streamError) {
           logger.error('Conversation stream interrupted', { error: streamError });
@@ -322,22 +331,26 @@ router.post('/:id/message', validate(sendConversationMessageSchema), async (req,
       });
     }
 
-    // Generate English title if still using default
-    if (needsTitle) {
-      const generatedTitle = await generateConversationTitle(
-        content,
-        replyContent || undefined
-      ).catch(() => null);
-      if (generatedTitle) {
-        conversation.title = generatedTitle;
-      }
-    }
-
+    // ── Persist conversation to DB FIRST (before sending done event) ──
+    // This ensures messages are saved even if the client disconnects.
     await conversation.save();
 
-    // Send final conversation state for sync
-    res.write(`data: ${JSON.stringify({ type: 'done', conversation })}\n\n`);
-    res.end();
+    // Generate English title if still using default (fire-and-forget: saves separately)
+    if (needsTitle) {
+      generateConversationTitle(content, replyContent || undefined)
+        .then(async (generatedTitle) => {
+          if (generatedTitle) {
+            await Conversation.findByIdAndUpdate(conversation._id, { title: generatedTitle });
+          }
+        })
+        .catch((err) => logger.error('Title generation failed', { error: err }));
+    }
+
+    // Send final conversation state for sync (only if client is still connected)
+    safeWrite(`data: ${JSON.stringify({ type: 'done', conversation })}\n\n`);
+    if (!clientDisconnected) {
+      res.end();
+    }
   } catch (error) {
     next(error);
   }
