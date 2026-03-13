@@ -37,15 +37,15 @@ function TypingIndicator() {
 }
 
 function formatTime(ts: string) {
-  try {
-    return new Date(ts).toLocaleTimeString('en-US', {
+  const date = new Date(ts);
+  if (!isNaN(date.getTime()) && ts.length > 5) {
+    return date.toLocaleTimeString([], {
       hour: 'numeric',
       minute: '2-digit',
       hour12: true,
     });
-  } catch {
-    return ts;
   }
+  return ts;
 }
 
 export function DiscussionFeed({ messages, showThinkingDefault = false }: DiscussionFeedProps) {
