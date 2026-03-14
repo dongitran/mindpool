@@ -310,7 +310,7 @@ export async function handleMeetingLoop(poolId: string): Promise<void> {
           const BATCH_SIZE_CHARS = 50;
 
           const streamResult = await withTimeout(
-            llmRouter.agentChat('full_response', chatMessages, { maxTokens: 2048, temperature: 0.7, stream: true }),
+            llmRouter.agentChat('full_response', chatMessages, { maxTokens: 50000, temperature: 0.7, stream: true }),
             30_000,
             `stream init for agent ${agentDoc.name}`
           );
