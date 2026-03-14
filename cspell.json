@@ -91,6 +91,7 @@
     "ciphertexts",
     "refetches",
     "buildx",
-    "Buildx"
+    "Buildx",
+    "wrapup"
   ]
 }

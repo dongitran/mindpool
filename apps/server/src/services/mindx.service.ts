@@ -10,6 +10,7 @@ import { poolService } from '../di';
 import { logger } from '../lib/logger';
 import { redis, POOL_LOCK_TTL_SEC, MEETING_QUEUE_KEY } from '../lib/redis';
 import { broadcastService } from './broadcast.service';
+import { logMeetingInfo, logMeetingWarn, logMeetingError } from '../lib/meetingLogger';
 import {
   generateRelevanceCheckMessages,
   generateWrapUpMessages,
@@ -140,6 +141,12 @@ export async function generateWrapUp(poolId: string): Promise<string> {
   const messages = await Message.find({ poolId }).sort({ timestamp: 1 });
   const transcript = messages.map((m) => `[${m.agentId}]: ${m.content}`).join('\n');
 
+  const wrapupStartMs = Date.now();
+  logMeetingInfo(poolId, 'wrapup_start', 'Wrap-up LLM call initiated', {
+    messageCount: messages.length,
+    transcriptLength: transcript.length,
+  });
+
   try {
     const chatMessages = generateWrapUpMessages(transcript);
 
@@ -159,13 +166,24 @@ export async function generateWrapUp(poolId: string): Promise<string> {
     await poolService.updatePoolStatus(poolId, 'completed');
     await broadcastService.broadcastPoolComplete(poolId, wrapUp);
 
+    logMeetingInfo(poolId, 'wrapup_complete', 'Wrap-up saved to MongoDB', {
+      contentLength: wrapUp.length,
+      durationMs: Date.now() - wrapupStartMs,
+    });
+    logMeetingInfo(poolId, 'meeting_completed', 'Pool status set to completed');
+
     return wrapUp;
   } catch (error) {
     logger.error('Wrap-up generation failed', { poolId, error });
+    logMeetingError(poolId, 'wrapup_error', 'Wrap-up LLM call failed, using fallback', {
+      error: error instanceof Error ? error.message : String(error),
+      durationMs: Date.now() - wrapupStartMs,
+    });
     const fallback = 'Cuộc thảo luận đã kết thúc. Cảm ơn các chuyên gia đã tham gia!';
     await poolService.addMessage(poolId, { agentId: 'mindx', content: fallback });
     await poolService.updatePoolStatus(poolId, 'completed');
     await broadcastService.broadcastPoolComplete(poolId, fallback);
+    logMeetingInfo(poolId, 'meeting_completed', 'Pool status set to completed (via fallback)');
     return fallback;
   }
 }
@@ -206,22 +224,35 @@ export async function generateConversationTitle(
   }
 }
 
+export const MAX_MEETING_TURNS = 10;
+export const MAX_EMPTY_ROUNDS = 3;
+
 export async function handleMeetingLoop(poolId: string): Promise<void> {
   // Distributed lock — prevents concurrent loops for the same pool
   const lockKey = `lock:pool:${poolId}`;
   const acquired = await redis.set(lockKey, '1', 'EX', POOL_LOCK_TTL_SEC, 'NX');
   if (!acquired) {
     logger.info('[MindX] Loop already running, skipping', { poolId });
+    logMeetingInfo(poolId, 'lock_skipped', 'Lock already held, skipping loop iteration');
     return;
   }
+
+  const turnKey = `pool:${poolId}:turns`;
+  const emptyRoundsKey = `pool:${poolId}:emptyRounds`;
 
   try {
     const pool = await Pool.findById(poolId);
     if (!pool || pool.status !== 'active') {
+      logMeetingInfo(poolId, 'meeting_loop_exit', 'Pool not active or not found, exiting loop', {
+        reason: !pool ? 'pool_not_found' : 'pool_not_active',
+        status: pool?.status ?? null,
+      });
       const qm = getQueueManager(poolId);
       const sd = getStopDetector(poolId);
       await qm.clear();
       await sd.reset();
+      await redis.del(turnKey);
+      await redis.del(emptyRoundsKey);
       return;
     }
 
@@ -235,56 +266,20 @@ export async function handleMeetingLoop(poolId: string): Promise<void> {
     const latestMessage = latestMessages[0]!;
     const poolContext = [...latestMessages].reverse().map((m) => `[${m.agentId}]: ${m.content}`).join('\n');
 
-    // Collect listening agents (excluding whoever just spoke)
-    const listeningAgentIds = pool.agents
-      .filter((a) => a.state === 'listening' && a.agentId !== latestMessage.agentId)
-      .map((a) => a.agentId);
-
-    // Pop next speaker before relevance checks (FIFO)
+    // Pop next speaker (FIFO)
     const nextAgentId = await queueManager.popFromQueue();
-
-    // Fetch all needed agent docs in one DB call
-    const allNeededIds = [...new Set([...listeningAgentIds, ...(nextAgentId ? [nextAgentId] : [])])];
-    const agentDocs = await Agent.find({ _id: { $in: allNeededIds } });
-    const agentMap = new Map(agentDocs.map((a) => [a._id.toString(), a]));
-
-    // Relevance checks in parallel: which listening agents should join the queue?
-    const relevanceResults = await Promise.allSettled(
-      listeningAgentIds.map(async (agentId) => {
-        const agentDoc = agentMap.get(agentId);
-        if (!agentDoc) return { agentId, shouldSpeak: false };
-        const shouldSpeak = await runRelevanceCheck(
-          agentId,
-          agentDoc.specialty,
-          latestMessage.content,
-          poolContext
-        );
-        return { agentId, shouldSpeak };
-      })
-    );
-
-    for (const result of relevanceResults) {
-      if (result.status !== 'fulfilled') continue;
-      const { agentId, shouldSpeak } = result.value;
-      if (shouldSpeak) {
-        const added = await queueManager.addToQueue(agentId);
-        if (added) {
-          await poolService.updateAgentState(poolId, agentId, 'queued');
-          await broadcastService.broadcastAgentState(poolId, agentId, 'queued');
-        }
-      }
-    }
-
-    // Broadcast updated queue
-    const queueState = await queueManager.getQueue();
-    await broadcastService.broadcastQueueUpdate(poolId, queueState);
+    let agentSpoke = false;
 
     // Let next agent speak
     if (nextAgentId) {
-      const agentDoc = agentMap.get(nextAgentId);
+      // Fetch agent doc
+      const agentDocs = await Agent.find({ _id: nextAgentId });
+      const agentDoc = agentDocs[0];
+
       if (agentDoc) {
         // Mark as speaking
         await poolService.updateAgentState(poolId, nextAgentId, 'speaking');
+        await broadcastService.broadcastAgentState(poolId, nextAgentId, 'speaking');
         await broadcastService.broadcastAgentTyping(
           poolId,
           nextAgentId,
@@ -292,11 +287,24 @@ export async function handleMeetingLoop(poolId: string): Promise<void> {
           agentDoc.icon,
           agentDoc.specialty
         );
+        logMeetingInfo(poolId, 'agent_turn_start', `Agent ${agentDoc.name} starting turn`, {
+          agentId: nextAgentId,
+          agentName: agentDoc.name,
+          agentSpecialty: agentDoc.specialty,
+        });
 
         const chatMessages = generateAgentResponseMessages(agentDoc, [...latestMessages].reverse());
 
+        let agentStartMs = 0;
+        let agentContentLength = 0;
+
         try {
           const startTime = Date.now();
+          agentStartMs = startTime;
+          logMeetingInfo(poolId, 'agent_llm_start', `LLM stream initiated for ${agentDoc.name}`, {
+            agentId: nextAgentId,
+            agentName: agentDoc.name,
+          });
           const STREAM_TIMEOUT_MS = 120_000;
           const BATCH_INTERVAL_MS = 100;
           const BATCH_SIZE_CHARS = 50;
@@ -332,6 +340,12 @@ export async function handleMeetingLoop(poolId: string): Promise<void> {
               for await (const delta of parseSSEStream(streamResult)) {
                 if (Date.now() - startTime > STREAM_TIMEOUT_MS) {
                   logger.warn('Stream timeout, using partial content', { agent: agentDoc.name, poolId });
+                  logMeetingWarn(poolId, 'agent_stream_timeout', `Stream timeout for ${agentDoc.name}`, {
+                    agentId: nextAgentId,
+                    agentName: agentDoc.name,
+                    elapsedMs: Date.now() - startTime,
+                    accumulatedLength: accumulated.length,
+                  });
                   break;
                 }
                 // Only accumulate content chunks; skip thinking/reasoning chunks
@@ -347,6 +361,12 @@ export async function handleMeetingLoop(poolId: string): Promise<void> {
               await flushBatch();
             } catch (streamError) {
               logger.error('Stream interrupted', { agent: agentDoc.name, poolId, error: streamError });
+              logMeetingError(poolId, 'agent_turn_error', `Stream interrupted for ${agentDoc.name}`, {
+                agentId: nextAgentId,
+                agentName: agentDoc.name,
+                error: streamError instanceof Error ? streamError.message : String(streamError),
+                hadPartialContent: accumulated.length > 0,
+              });
               await flushBatch();
               if (!accumulated) throw streamError;
             }
@@ -368,8 +388,16 @@ export async function handleMeetingLoop(poolId: string): Promise<void> {
             thinkSec,
             thinking
           );
+
+          agentContentLength = content.length;
+          agentSpoke = true;
         } catch (error) {
           logger.error('Agent failed to respond', { agent: agentDoc.name, poolId, error });
+          logMeetingError(poolId, 'agent_turn_error', `Agent ${agentDoc.name} failed to respond`, {
+            agentId: nextAgentId,
+            agentName: agentDoc.name,
+            error: error instanceof Error ? error.message : String(error),
+          });
           await broadcastService.broadcastError(
             poolId,
             `${agentDoc.name} không phản hồi được. Tiếp tục...`
@@ -378,23 +406,155 @@ export async function handleMeetingLoop(poolId: string): Promise<void> {
 
         // Mark as done / back to listening
         await poolService.updateAgentState(poolId, nextAgentId, 'listening');
+        await broadcastService.broadcastAgentState(poolId, nextAgentId, 'listening');
         await broadcastService.broadcastAgentDone(poolId, nextAgentId);
+
+        // Increment turn counter (only if agent actually spoke)
+        if (agentSpoke) {
+          const turnCount = await redis.incr(turnKey);
+          await redis.expire(turnKey, POOL_LOCK_TTL_SEC);
+          logger.info('[MindX] Turn completed', { poolId, turn: turnCount, agent: agentDoc.name });
+          logMeetingInfo(poolId, 'agent_turn_complete', `Agent ${agentDoc.name} completed turn`, {
+            agentId: nextAgentId,
+            agentName: agentDoc.name,
+            turnCount,
+            durationMs: Date.now() - agentStartMs,
+            contentLength: agentContentLength,
+          });
+
+          // Reset empty rounds counter — each successful turn resets the clock
+          await redis.del(emptyRoundsKey);
+
+          // Check max turns
+          await stopDetector.checkMaxTurns(turnCount, MAX_MEETING_TURNS);
+        }
       }
     }
 
-    // Check stop signals
+    // ── Post-turn: relevance checks on LATEST message (including the new response) ──
+    const freshMessages = await Message.find({ poolId }).sort({ timestamp: -1 }).limit(5);
+    const freshLatest = freshMessages[0];
+    if (freshLatest) {
+      const freshContext = [...freshMessages].reverse().map((m) => `[${m.agentId}]: ${m.content}`).join('\n');
+
+      // Collect listening agents (excluding whoever just spoke)
+      const listeningAgentIds = pool.agents
+        .filter((a) => a.state === 'listening' && a.agentId !== freshLatest.agentId)
+        .map((a) => a.agentId);
+
+      // Fetch all agent docs for relevance checks
+      const agentDocs = await Agent.find({ _id: { $in: listeningAgentIds } });
+      const agentMap = new Map(agentDocs.map((a) => [a._id.toString(), a]));
+
+      const relevanceResults = await Promise.allSettled(
+        listeningAgentIds.map(async (agentId) => {
+          const doc = agentMap.get(agentId);
+          if (!doc) return { agentId, shouldSpeak: false };
+          const relevanceStart = Date.now();
+          const shouldSpeak = await runRelevanceCheck(
+            agentId,
+            doc.specialty,
+            freshLatest.content,
+            freshContext
+          );
+          logMeetingInfo(poolId, 'relevance_check', `Relevance check for agent ${doc.name}`, {
+            agentId,
+            agentName: doc.name,
+            result: shouldSpeak ? 'yes' : 'no',
+            durationMs: Date.now() - relevanceStart,
+          });
+          return { agentId, shouldSpeak };
+        })
+      );
+
+      for (const result of relevanceResults) {
+        if (result.status !== 'fulfilled') continue;
+        const { agentId, shouldSpeak } = result.value;
+        if (shouldSpeak) {
+          const added = await queueManager.addToQueue(agentId);
+          if (added) {
+            await poolService.updateAgentState(poolId, agentId, 'queued');
+            await broadcastService.broadcastAgentState(poolId, agentId, 'queued');
+            logMeetingInfo(poolId, 'agent_queued', `Agent queued after relevance check`, {
+              agentId,
+            });
+          }
+        }
+      }
+
+      // Broadcast updated queue
+      const queueState = await queueManager.getQueue();
+      await broadcastService.broadcastQueueUpdate(poolId, queueState);
+    }
+
+    // ── Decide: wrap-up or continue ──
     const currentQueueSize = await queueManager.getSize();
     await stopDetector.checkQueueEmpty(currentQueueSize);
+
     if (await stopDetector.shouldStop()) {
+      logger.info('[MindX] Stop signal detected, generating wrap-up', { poolId });
+      const signals = await stopDetector.getSignals();
+      logMeetingInfo(poolId, 'stop_signal_detected', 'Stop signal detected, generating wrap-up', {
+        reason: signals.maxTurnsReached ? 'maxTurns' : 'queueEmpty+userTrigger',
+        signals,
+      });
       await generateWrapUp(poolId);
-      // Cleanup Redis state for this pool
       await queueManager.clear();
       await stopDetector.reset();
+      await redis.del(turnKey);
+      await redis.del(emptyRoundsKey);
     } else if (currentQueueSize > 0) {
-      // Re-enqueue so the next agent in the queue gets to speak
+      // Agents waiting → continue immediately
+      await redis.del(emptyRoundsKey);
       await redis.rpush(MEETING_QUEUE_KEY, JSON.stringify({ poolId }));
-      logger.info('[MindX] Re-enqueued meeting loop for next turn', { poolId, queueSize: currentQueueSize });
+      logger.info('[MindX] Re-enqueued meeting loop (agents waiting)', { poolId, queueSize: currentQueueSize });
+    } else if (agentSpoke) {
+      // An agent just spoke but nobody raised hand → force-add next agent round-robin
+      const emptyRounds = await redis.incr(emptyRoundsKey);
+      await redis.expire(emptyRoundsKey, POOL_LOCK_TTL_SEC);
+
+      if (emptyRounds <= MAX_EMPTY_ROUNDS) {
+        // Force-add next agent in round-robin (skip the one who just spoke)
+        const candidates = pool.agents.filter((a) => a.agentId !== nextAgentId);
+        if (candidates.length > 0) {
+          // Pick the next agent deterministically based on empty round count
+          const pick = candidates[(emptyRounds - 1) % candidates.length];
+          const added = await queueManager.addToQueue(pick.agentId);
+          if (added) {
+            await poolService.updateAgentState(poolId, pick.agentId, 'queued');
+            await broadcastService.broadcastAgentState(poolId, pick.agentId, 'queued');
+            logger.info('[MindX] Force-added agent (round-robin)', { poolId, agent: pick.name, emptyRounds });
+            logMeetingInfo(poolId, 'force_round_robin', `Force round-robin: ${pick.name} queued`, {
+              agentId: pick.agentId,
+              agentName: pick.name,
+              emptyRounds,
+            });
+          }
+          await redis.rpush(MEETING_QUEUE_KEY, JSON.stringify({ poolId }));
+        } else {
+          // Only 1 agent in pool → wrap up
+          logger.info('[MindX] Single-agent pool, wrapping up', { poolId });
+          await generateWrapUp(poolId);
+          await queueManager.clear();
+          await stopDetector.reset();
+          await redis.del(turnKey);
+          await redis.del(emptyRoundsKey);
+        }
+      } else {
+        // Too many empty rounds → wrap up
+        logger.info('[MindX] Max empty rounds reached, wrapping up', { poolId, emptyRounds });
+        logMeetingWarn(poolId, 'max_empty_rounds', 'Max empty rounds reached, initiating wrap-up', {
+          emptyRounds,
+          maxEmptyRounds: MAX_EMPTY_ROUNDS,
+        });
+        await generateWrapUp(poolId);
+        await queueManager.clear();
+        await stopDetector.reset();
+        await redis.del(turnKey);
+        await redis.del(emptyRoundsKey);
+      }
     }
+    // else: no agent spoke and queue empty on first call → initial setup still in progress, don't re-enqueue
   } finally {
     // Always release lock
     await redis.del(lockKey);

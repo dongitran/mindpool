@@ -1,6 +1,7 @@
 import { redisWorker, MEETING_QUEUE_KEY } from '../lib/redis';
 import { handleMeetingLoop } from '../services/mindx.service';
 import { logger } from '../lib/logger';
+import { logMeetingInfo, logMeetingError } from '../lib/meetingLogger';
 
 let running = false;
 
@@ -16,6 +17,7 @@ export async function startWorker(): Promise<void> {
   let consecutiveErrors = 0;
 
   while (running) {
+    let poolId: string | undefined;
     try {
       // BLPOP with 5s timeout so we can check the `running` flag on each iteration
       const result = await redisWorker.blpop(MEETING_QUEUE_KEY, 5);
@@ -24,7 +26,6 @@ export async function startWorker(): Promise<void> {
       consecutiveErrors = 0; // reset on successful BLPOP
 
       const [, payload] = result;
-      let poolId: string;
       try {
         ({ poolId } = JSON.parse(payload) as { poolId: string });
       } catch {
@@ -33,11 +34,19 @@ export async function startWorker(): Promise<void> {
       }
 
       logger.info('[Worker] Processing job', { poolId });
+      logMeetingInfo(poolId, 'worker_job_received', 'Worker picked up meeting job');
       await handleMeetingLoop(poolId);
     } catch (error) {
       consecutiveErrors++;
       const delay = Math.min(1_000 * Math.pow(2, consecutiveErrors - 1), 30_000);
       logger.error('[Worker] Job error, retrying in %dms', delay, { error, consecutiveErrors });
+      if (poolId) {
+        logMeetingError(poolId, 'worker_job_error', 'Worker job failed', {
+          consecutiveErrors,
+          delayMs: delay,
+          error: error instanceof Error ? error.message : String(error),
+        });
+      }
       await new Promise((resolve) => setTimeout(resolve, delay));
     }
   }

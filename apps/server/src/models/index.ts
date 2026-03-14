@@ -16,3 +16,6 @@ export type { SettingsDocument } from './Settings';
 export { LLMLog } from './LLMLog';
 export type { LLMLogDocument } from './LLMLog';
 
+export { MeetingLog } from './MeetingLog';
+export type { MeetingLogDocument, MeetingEvent, MeetingLogLevel } from './MeetingLog';
+

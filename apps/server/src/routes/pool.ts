@@ -3,6 +3,7 @@ import { poolService } from '../di';
 import * as mindxService from '../services/mindx.service';
 import { redis, MEETING_QUEUE_KEY } from '../lib/redis';
 import { logger } from '../lib/logger';
+import { logMeetingInfo, logMeetingError } from '../lib/meetingLogger';
 import { validate } from '../middleware/validate';
 import { createPoolSchema, sendMessageSchema } from '@mindpool/shared';
 
@@ -12,9 +13,16 @@ const router = Router();
 router.post('/pool/create', validate(createPoolSchema), async (req, res, next) => {
   try {
     const { topic, agentIds, conversationId } = req.body;
+    logger.info('Pool creation request received', { topic, agentCount: agentIds?.length, conversationId });
 
     const pool = await poolService.createPool(topic, agentIds, conversationId || '');
     const poolId = pool._id.toString();
+
+    logMeetingInfo(poolId, 'pool_created', 'Pool document created', {
+      topic,
+      agentCount: agentIds?.length,
+      conversationId: conversationId || null,
+    });
 
     try {
       // Generate opening announcement (sync — needed before loop starts)
@@ -35,10 +43,17 @@ router.post('/pool/create', validate(createPoolSchema), async (req, res, next) =
       // Enqueue meeting loop job — worker picks it up via BLPOP
       await redis.rpush(MEETING_QUEUE_KEY, JSON.stringify({ poolId }));
       logger.info('Meeting loop enqueued', { poolId });
+      logMeetingInfo(poolId, 'meeting_started', 'Meeting loop enqueued', {
+        openingAgentId: openingAgent?.agentId ?? null,
+      });
 
       res.status(201).json(pool);
+      logger.info('Pool created successfully', { poolId, topic });
     } catch (innerError) {
       logger.error('Failed to initialize pool post-creation. Rolling back MongoDB...', { poolId, error: innerError });
+      logMeetingError(poolId, 'pool_creation_error', 'Pool initialization failed, rolling back', {
+        error: innerError instanceof Error ? innerError.message : String(innerError),
+      });
       try {
         const { Pool } = await import('../models/Pool.js');
         await Pool.findByIdAndDelete(poolId);
@@ -48,6 +63,7 @@ router.post('/pool/create', validate(createPoolSchema), async (req, res, next) =
       throw innerError;
     }
   } catch (error) {
+    logger.error('Pool creation endpoint failed', { error, body: req.body });
     next(error);
   }
 });
@@ -93,6 +109,13 @@ router.post('/pool/:id/message', validate(sendMessageSchema), async (req, res, n
 
     // Update stop detector with user message (same process — in-memory is fine)
     await mindxService.getStopDetector(poolId).checkUserTrigger(content);
+    const stopKeywordDetected = ['okay', 'cảm ơn', 'đủ rồi', 'kết thúc'].some((kw) =>
+      content.toLowerCase().includes(kw)
+    );
+    logMeetingInfo(poolId, 'user_message', 'User message received', {
+      contentLength: content.length,
+      stopKeywordDetected,
+    });
 
     // Enqueue next meeting loop round
     await redis.rpush(MEETING_QUEUE_KEY, JSON.stringify({ poolId }));

@@ -17,6 +17,7 @@ const envSchema = z.object({
   LLM_RELEVANCE_CHECK_MODEL: z.string().optional().default(''),
   LLM_RECAP_SYNTHESIS_PROVIDER: z.string().optional().default(''),
   LLM_RECAP_SYNTHESIS_MODEL: z.string().optional().default(''),
+  LOGS_MEETING_ENABLE: z.enum(['true', 'false']).optional().default('false').transform((v) => v === 'true'),
 });
 
 const parsedEnv = envSchema.safeParse(process.env);
@@ -34,6 +35,7 @@ export const config = {
   minimaxApiKey: parsedEnv.data.MINIMAX_API_KEY,
   host: parsedEnv.data.MINDPOOL_HOST,
   encryptionKey: parsedEnv.data.ENCRYPTION_KEY,
+  logsMeetingEnable: parsedEnv.data.LOGS_MEETING_ENABLE,
   llmRouting: {
     fullResponse: {
       provider: parsedEnv.data.LLM_FULL_RESPONSE_PROVIDER,
