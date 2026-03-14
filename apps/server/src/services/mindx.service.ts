@@ -138,8 +138,12 @@ export async function generateWrapUp(poolId: string): Promise<string> {
   const pool = await Pool.findById(poolId);
   if (!pool) throw new Error('Pool not found');
 
-  const messages = await Message.find({ poolId }).sort({ timestamp: 1 });
-  const transcript = messages.map((m) => `[${m.agentId}]: ${m.content}`).join('\n');
+  // Use last 20 messages to avoid overloading the LLM with huge transcripts
+  const messages = await Message.find({ poolId }).sort({ timestamp: -1 }).limit(20);
+  messages.reverse(); // oldest first for readability
+  const transcriptRaw = messages.map((m) => `[${m.agentId}]: ${m.content}`).join('\n');
+  // Hard cap at 20,000 chars to stay within model context limits
+  const transcript = transcriptRaw.length > 20_000 ? transcriptRaw.slice(-20_000) : transcriptRaw;
 
   const wrapupStartMs = Date.now();
   logMeetingInfo(poolId, 'wrapup_start', 'Wrap-up LLM call initiated', {
@@ -151,12 +155,15 @@ export async function generateWrapUp(poolId: string): Promise<string> {
     const chatMessages = generateWrapUpMessages(transcript);
 
     const result = await withTimeout(
-      llmRouter.agentChat('full_response', chatMessages, { maxTokens: 1024, temperature: 0.5 }),
+      llmRouter.agentChat('full_response', chatMessages, { maxTokens: 4096, temperature: 0.5 }),
       60_000,
       'generateWrapUp'
     );
 
-    const wrapUp = typeof result === 'string' ? result : 'Cuộc thảo luận đã kết thúc.';
+    const wrapUp =
+      typeof result === 'string' && result.trim()
+        ? result.trim()
+        : 'Cuộc thảo luận đã kết thúc.';
 
     await poolService.addMessage(poolId, {
       agentId: 'mindx',
@@ -310,7 +317,7 @@ export async function handleMeetingLoop(poolId: string): Promise<void> {
           const BATCH_SIZE_CHARS = 50;
 
           const streamResult = await withTimeout(
-            llmRouter.agentChat('full_response', chatMessages, { maxTokens: 50000, temperature: 0.7, stream: true }),
+            llmRouter.agentChat('full_response', chatMessages, { maxTokens: 8000, temperature: 0.7, stream: true }),
             30_000,
             `stream init for agent ${agentDoc.name}`
           );
@@ -422,9 +429,6 @@ export async function handleMeetingLoop(poolId: string): Promise<void> {
             contentLength: agentContentLength,
           });
 
-          // Reset empty rounds counter — each successful turn resets the clock
-          await redis.del(emptyRoundsKey);
-
           // Check max turns
           await stopDetector.checkMaxTurns(turnCount, MAX_MEETING_TURNS);
         }
@@ -451,10 +455,12 @@ export async function handleMeetingLoop(poolId: string): Promise<void> {
           const doc = agentMap.get(agentId);
           if (!doc) return { agentId, shouldSpeak: false };
           const relevanceStart = Date.now();
+          // Truncate latest message to avoid overwhelming the relevance-check model
+          const latestSnippet = freshLatest.content.slice(0, 800);
           const shouldSpeak = await runRelevanceCheck(
             agentId,
             doc.specialty,
-            freshLatest.content,
+            latestSnippet,
             freshContext
           );
           logMeetingInfo(poolId, 'relevance_check', `Relevance check for agent ${doc.name}`, {
