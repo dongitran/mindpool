@@ -11,8 +11,8 @@ interface Agent {
 
 interface AgentSuggestionProps {
   agents: Agent[];
-  meetingId: string;
   meetingCreated?: boolean;
+  isLoading?: boolean;
   onToggle: (agentId: string) => void;
   onStart: () => void;
   onGoto: () => void;
@@ -21,6 +21,7 @@ interface AgentSuggestionProps {
 export function AgentSuggestion({
   agents,
   meetingCreated,
+  isLoading,
   onToggle,
   onStart,
   onGoto,
@@ -75,9 +76,10 @@ export function AgentSuggestion({
       ) : (
         <button
           onClick={onStart}
-          className="mt-4 w-full py-4 px-6 bg-gradient-to-br from-accent to-[#2de8a8] border-none rounded-xl text-bg font-[Sora] text-base font-bold cursor-pointer flex items-center justify-center gap-2 transition-all hover:translate-y-[-1px] hover:shadow-[0_8px_24px_rgba(61,255,192,0.3)] active:translate-y-[1px]"
+          disabled={isLoading}
+          className={`mt-4 w-full py-4 px-6 bg-gradient-to-br from-accent to-[#2de8a8] border-none rounded-xl text-bg font-[Sora] text-base font-bold cursor-pointer flex items-center justify-center gap-2 transition-all ${isLoading ? 'opacity-70 cursor-not-allowed' : 'hover:translate-y-[-1px] hover:shadow-[0_8px_24px_rgba(61,255,192,0.3)] active:translate-y-[1px]'}`}
         >
-          🚀 Bắt đầu Meeting
+          {isLoading ? '⏳ Đang tạo Meeting...' : '🚀 Bắt đầu Meeting'}
         </button>
       )}
     </div>

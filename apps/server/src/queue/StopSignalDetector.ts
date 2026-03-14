@@ -24,20 +24,29 @@ export class StopSignalDetector {
     }
   }
 
+  async checkMaxTurns(turnCount: number, maxTurns: number): Promise<void> {
+    if (turnCount >= maxTurns) {
+      await redis.hset(this.key, 'maxTurnsReached', '1');
+      await redis.expire(this.key, POOL_LOCK_TTL_SEC);
+    }
+  }
+
   async shouldStop(): Promise<boolean> {
     const signals = await this.getSignals();
-    return signals.queueEmpty && signals.userTrigger;
+    // Stop if max turns reached OR (queue empty AND user triggered stop)
+    return signals.maxTurnsReached || (signals.queueEmpty && signals.userTrigger);
   }
 
   async reset(): Promise<void> {
     await redis.del(this.key);
   }
 
-  async getSignals(): Promise<{ queueEmpty: boolean; userTrigger: boolean }> {
+  async getSignals(): Promise<{ queueEmpty: boolean; userTrigger: boolean; maxTurnsReached: boolean }> {
     const data = await redis.hgetall(this.key);
     return {
       queueEmpty: data.queueEmpty === '1',
       userTrigger: data.userTrigger === '1',
+      maxTurnsReached: data.maxTurnsReached === '1',
     };
   }
 }

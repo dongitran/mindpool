@@ -105,7 +105,7 @@ describe('StopSignalDetector', () => {
 
       await detector.reset();
       expect(await detector.shouldStop()).toBe(false);
-      expect(await detector.getSignals()).toEqual({ queueEmpty: false, userTrigger: false });
+      expect(await detector.getSignals()).toEqual({ queueEmpty: false, userTrigger: false, maxTurnsReached: false });
     });
   });
 });

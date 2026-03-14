@@ -41,6 +41,7 @@ services:
       MONGO_URI: mongodb://mongodb:27017/mindpool
       REDIS_URL: redis://redis:6379
       PORT: 3001
+      NODE_ENV: development
     depends_on:
       mongodb:
         condition: service_healthy

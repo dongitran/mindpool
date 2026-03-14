@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import type { Request, Response } from 'express';
-import { Message } from '../models';
+import { Message, Pool } from '../models';
 import { logger } from '../lib/logger';
 import { redisSub } from '../lib/redis';
 
@@ -80,6 +80,21 @@ router.get('/:poolId', async (req: Request<{ poolId: string }>, res: Response) =
     for (const msg of messages) {
       // Send the actual message timestamp as the id so reconnects skip this exact message
       res.write(`id: ${msg.timestamp.toISOString()}\ndata: ${JSON.stringify({ type: 'message', message: msg })}\n\n`);
+    }
+
+    // Send current agent states and queue so late-joining clients see correct state
+    const pool = await Pool.findById(poolId);
+    if (pool) {
+      for (const agent of pool.agents) {
+        if (agent.state && agent.state !== 'listening') {
+          res.write(`data: ${JSON.stringify({ type: 'agent_state', agentId: agent.agentId, state: agent.state })}\n\n`);
+        }
+      }
+      // Send queue state
+      if (pool.queue && pool.queue.length > 0) {
+        const queueData = pool.queue.map((agentId: string, i: number) => ({ agentId, position: i + 1 }));
+        res.write(`data: ${JSON.stringify({ type: 'queue_update', queue: queueData })}\n\n`);
+      }
     }
   } catch (err) {
     logger.error('SSE error fetching messages', { error: err });

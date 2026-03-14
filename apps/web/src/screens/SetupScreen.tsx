@@ -73,7 +73,7 @@ export function SetupScreen() {
   const [messages, setMessages] = useState<ConvMessage[]>([GREETING]);
   const [title] = useState('MindX');
   const [sub] = useState('Mô tả chủ đề — AI sẽ gợi ý agents phù hợp');
-  const [createdMeetings, setCreatedMeetings] = useState<Set<string>>(new Set());
+  const [creatingPool, setCreatingPool] = useState<string | null>(null);
   const [isTyping, setIsTyping] = useState(false);
   const msgsRef = useRef<HTMLDivElement>(null);
   // Skip fetching conversation when we've just locally created it in handleSend
@@ -200,9 +200,21 @@ export function SetupScreen() {
       queryClient.invalidateQueries({ queryKey: ['conversations'] });
 
       if (updatedConv.messages?.length) {
-        // Replace entire local message array with the final server state
-        setMessages(
-          updatedConv.messages.map((m: RawConversationMessage, i: number) => {
+        // Collect btnIds that were locally transitioned to bot-created
+        // (linkMeeting may not have persisted yet, so server still has bot-agents)
+        setMessages((currentMsgs) => {
+          const localCreatedBtnIds = new Set(
+            currentMsgs
+              .filter((m) => m.type === 'bot-created' && m.btnId)
+              .map((m) => m.btnId!)
+          );
+          const localCreatedMap = new Map(
+            currentMsgs
+              .filter((m) => m.type === 'bot-created' && m.btnId)
+              .map((m) => [m.btnId!, m])
+          );
+
+          return updatedConv.messages.map((m: RawConversationMessage, i: number) => {
             let stableId = m._id || m.id;
 
             if (i === 0) {
@@ -217,14 +229,24 @@ export function SetupScreen() {
               // Ensure intro flows to UI if content is empty
             }
 
+            // Preserve local bot-created transition that server hasn't persisted yet
+            const localVersion = m.btnId ? localCreatedMap.get(m.btnId) : undefined;
+            if (localVersion && localCreatedBtnIds.has(m.btnId!)) {
+              return {
+                ...localVersion,
+                id: stableId,
+                skipStream: true,
+              } as ConvMessage;
+            }
+
             return {
               ...m,
               id: stableId,
               isThinkingDone: !!m.thinking, // If it has thinking in history, it's done
               skipStream: true, // All messages are already shown, no animation needed
             };
-          }) as ConvMessage[]
-        );
+          }) as ConvMessage[];
+        });
       }
     } catch (err) {
       console.error('DEBUG: catch error in handleSend', err);
@@ -242,15 +264,96 @@ export function SetupScreen() {
     }
   }, [currentConversationId, setCurrentConversation, setMessages, setIsTyping, queryClient]);
 
-  const handleStartMeeting = async (meetingId: string) => {
-    setCreatedMeetings((prev) => new Set(prev).add(meetingId));
-    setTimeout(() => navigateToMeeting(meetingId), 600);
+  const handleStartMeeting = async (btnId: string) => {
+    if (creatingPool) return; // Prevent double-click
+
+    // 1. Find the bot-agents message by btnId
+    const agentMsg = messages.find(
+      (m) => m.type === 'bot-agents' && m.btnId === btnId
+    );
+    if (!agentMsg?.agents) return;
+
+    // 2. Get checked agent IDs
+    const checkedAgentIds = agentMsg.agents
+      .filter((a) => a.checked)
+      .map((a) => a.agentId || a.id || '')
+      .filter(Boolean);
+
+    if (checkedAgentIds.length === 0) {
+      // Show error if no agents selected
+      setMessages((prev) => [
+        ...prev,
+        {
+          id: crypto.randomUUID(),
+          type: 'bot' as const,
+          time: makeTime(),
+          content: '⚠️ Hãy chọn ít nhất 1 agent để bắt đầu meeting!',
+        },
+      ]);
+      return;
+    }
+
+    // 3. Determine topic: find the user message immediately before this suggestion
+    const msgIndex = messages.indexOf(agentMsg);
+    let topic = '';
+    for (let i = msgIndex - 1; i >= 0; i--) {
+      if (messages[i].type === 'user' && messages[i].content) {
+        topic = messages[i].content!;
+        break;
+      }
+    }
+    if (!topic) topic = 'Discussion';
+
+    // 4. Create pool
+    setCreatingPool(btnId);
+    try {
+      const pool = await api.createPool(topic, checkedAgentIds, currentConversationId || '');
+
+      // 5. Update the message locally: bot-agents → bot-created
+      setMessages((prev) =>
+        prev.map((m) =>
+          m.btnId === btnId
+            ? {
+                ...m,
+                type: 'bot-created' as const,
+                meetingId: pool._id,
+                meetingTitle: pool.title,
+                agentBadges: pool.agents?.map((a) => `${a.icon} ${a.name}`) || [],
+              }
+            : m
+        )
+      );
+
+      // 6. Persist to server (fire-and-forget — don't block navigation)
+      if (currentConversationId) {
+        api.linkMeetingToConversation(currentConversationId, btnId, pool._id, pool.title)
+          .catch((err) => console.error('Failed to link meeting:', err));
+      }
+
+      // 7. Invalidate caches and navigate
+      queryClient.invalidateQueries({ queryKey: ['conversations'] });
+      queryClient.invalidateQueries({ queryKey: ['pools'] });
+      setTimeout(() => navigateToMeeting(pool._id), 600);
+    } catch (err) {
+      console.error('Failed to create pool:', err);
+      setMessages((prev) => [
+        ...prev,
+        {
+          id: crypto.randomUUID(),
+          type: 'bot' as const,
+          time: makeTime(),
+          content: '⚠️ Không thể tạo meeting. Vui lòng thử lại!',
+        },
+      ]);
+    } finally {
+      setCreatingPool(null);
+    }
   };
 
-  const handleToggleAgent = (_btnId: string, agentId: string) => {
+  const handleToggleAgent = (btnId: string, agentId: string) => {
     setMessages((prev) =>
       prev.map((msg) => {
-        if (msg.type === 'bot-agents' && msg.agents) {
+        if (msg.type === 'bot-agents' && msg.agents && msg.btnId === btnId) {
           return {
             ...msg,
             agents: msg.agents.map((a) => {
@@ -307,12 +410,13 @@ export function SetupScreen() {
                 </div>
               ) : (
                 <MessageBubble
-                  message={msg}
-                  onStartMeeting={handleStartMeeting}
-                  onGoToMeeting={(id) => navigateToMeeting(id)}
-                  onToggleAgent={handleToggleAgent}
-                  meetingCreated={msg.meetingId ? createdMeetings.has(msg.meetingId) : false}
-                />
+                message={msg}
+                onStartMeeting={handleStartMeeting}
+                onGoToMeeting={(id) => navigateToMeeting(id)}
+                onToggleAgent={handleToggleAgent}
+                meetingCreated={msg.type === 'bot-created'}
+                isLoading={creatingPool === msg.btnId}
+              />
               )}
             </div>
           );

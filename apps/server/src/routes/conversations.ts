@@ -299,7 +299,7 @@ router.post('/:id/message', validate(sendConversationMessageSchema), async (req,
           intro: cleanContent,
           agents: results,
           thinking: thinkingContent,
-          btnId: `start-btn-${conversation._id}`,
+          btnId: `start-btn-${conversation._id}-${Date.now()}`,
         });
       } else {
         (conversation.messages as unknown as Array<Record<string, unknown>>).push({
@@ -339,6 +339,38 @@ router.post('/:id/message', validate(sendConversationMessageSchema), async (req,
     if (!clientDisconnected) {
       res.end();
     }
+  } catch (error) {
+    next(error);
+  }
+});
+
+// PATCH /conversations/:id/link-meeting — persist meetingId on conversation message
+router.patch('/:id/link-meeting', async (req, res, next) => {
+  try {
+    const { btnId, meetingId, meetingTitle } = req.body;
+    if (!btnId || !meetingId) {
+      res.status(400).json({ error: { message: 'btnId and meetingId are required' } });
+      return;
+    }
+
+    const conversation = await Conversation.findById(req.params.id);
+    if (!conversation) {
+      res.status(404).json({ error: { message: 'Conversation not found' } });
+      return;
+    }
+
+    const messages = conversation.messages as unknown as Array<Record<string, unknown>>;
+    const msgIndex = messages.findIndex((m) => m.btnId === btnId);
+    if (msgIndex >= 0) {
+      messages[msgIndex].type = 'bot-created';
+      messages[msgIndex].meetingId = meetingId;
+      messages[msgIndex].meetingTitle = meetingTitle || '';
+      messages[msgIndex].agentBadges = (messages[msgIndex].agents as Array<{ icon: string; name: string }>)
+        ?.map((a) => `${a.icon} ${a.name}`) || [];
+    }
+
+    await conversation.save();
+    res.json({ ok: true });
   } catch (error) {
     next(error);
   }

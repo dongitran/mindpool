@@ -53,7 +53,7 @@ const globalLimiter = rateLimit({
 
 const poolCreateLimiter = rateLimit({
   windowMs: 60_000,
-  max: isDev ? 100 : 5,
+  max: isDev ? 100 : 20,
   standardHeaders: true,
   legacyHeaders: false,
   store: new RedisStore({ sendCommand: (...args: string[]) => redis.call(args[0], ...args.slice(1)) as Promise<RedisReply> }),

@@ -73,7 +73,14 @@ export default function App() {
           _id: c._id,
           title: c.title,
           sub: c.sub || '',
-          meetings: [],
+          meetings: pools
+            .filter((p) => p.conversationId === c._id)
+            .map((p) => ({
+              _id: p._id,
+              title: p.title,
+              status: p.status,
+              agents: p.agents || [],
+            })),
         }))}
       />
       <main className="flex-1 min-w-0 flex flex-col overflow-hidden">

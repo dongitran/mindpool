@@ -15,6 +15,7 @@ const { mockRedis, mockChat, mockAgents } = vi.hoisted(() => {
     lpop: vi.fn().mockResolvedValue(null),
     eval: vi.fn(),
     expire: vi.fn(),
+    incr: vi.fn().mockResolvedValue(1),
   };
 
   const mockChat = vi.fn();

@@ -32,10 +32,11 @@ interface MessageProps {
     meetingTitle?: string;
     agentBadges?: string[];
   };
-  onStartMeeting?: (meetingId: string) => void;
+  onStartMeeting?: (btnId: string) => void;
   onGoToMeeting?: (meetingId: string) => void;
   onToggleAgent?: (btnId: string, agentId: string) => void;
   meetingCreated?: boolean;
+  isLoading?: boolean;
 }
 
 export function MessageBubble({
@@ -44,6 +45,7 @@ export function MessageBubble({
   onGoToMeeting,
   onToggleAgent,
   meetingCreated,
+  isLoading,
 }: MessageProps) {
   if (message.type === 'user') {
     return (
@@ -99,10 +101,10 @@ export function MessageBubble({
           )}
           <AgentSuggestion
             agents={message.agents || []}
-            meetingId={message.meetingId || ''}
             meetingCreated={meetingCreated}
+            isLoading={isLoading}
             onToggle={(agentId) => onToggleAgent?.(message.btnId || '', agentId)}
-            onStart={() => onStartMeeting?.(message.meetingId || '')}
+            onStart={() => onStartMeeting?.(message.btnId || '')}
             onGoto={() => onGoToMeeting?.(message.meetingId || '')}
           />
           <div className="text-[10px] text-text-dim mt-1 px-1">

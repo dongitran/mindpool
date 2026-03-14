@@ -14,6 +14,8 @@ const ConversationMessageSchema = new Schema(
     intro: { type: String },
     agents: [
       {
+        id: { type: String },
+        agentId: { type: String },
         icon: String,
         name: String,
         desc: String,

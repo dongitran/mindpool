@@ -111,4 +111,10 @@ export const api = {
       : `${API_BASE}/stream/${poolId}`;
     return new EventSource(url);
   },
+  // Link meeting to conversation (persist meetingId on bot-agents message)
+  linkMeetingToConversation: (conversationId: string, btnId: string, meetingId: string, meetingTitle: string) =>
+    request<{ ok: boolean }>(`/conversations/${conversationId}/link-meeting`, {
+      method: 'PATCH',
+      body: JSON.stringify({ btnId, meetingId, meetingTitle }),
+    }),
 };
