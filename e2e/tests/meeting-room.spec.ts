@@ -69,7 +69,8 @@ test.describe('Meeting Room - Event Driven States', () => {
             }, 500);
           } else {
             // Return actual Native EventSource if URLs don't match the mock condition
-            return new OriginalEventSource(url);
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            return new OriginalEventSource(url) as any;
           }
         }
 

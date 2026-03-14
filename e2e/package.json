@@ -5,6 +5,7 @@
   "scripts": {
     "test": "playwright test",
     "test:docker": "BASE_URL=http://localhost:3000 playwright test",
+    "test:meeting": "MEETING_E2E=true BASE_URL=http://localhost:3001 playwright test meeting-e2e.spec.ts",
     "report": "playwright show-report"
   },
   "devDependencies": {
