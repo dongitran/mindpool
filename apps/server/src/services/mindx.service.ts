@@ -154,16 +154,26 @@ export async function generateWrapUp(poolId: string): Promise<string> {
   try {
     const chatMessages = generateWrapUpMessages(transcript);
 
-    const result = await withTimeout(
-      llmRouter.agentChat('full_response', chatMessages, { maxTokens: 4096, temperature: 0.5 }),
+    // Use streaming to avoid empty content from reasoning models (kimi-for-coding
+    // returns empty message.content in non-streaming mode; content lives in stream deltas)
+    const streamResult = await withTimeout(
+      llmRouter.agentChat('full_response', chatMessages, { maxTokens: 4096, temperature: 0.5, stream: true }),
       60_000,
       'generateWrapUp'
     );
 
-    const wrapUp =
-      typeof result === 'string' && result.trim()
-        ? result.trim()
-        : 'Cuộc thảo luận đã kết thúc.';
+    let wrapUp = '';
+    if (typeof streamResult === 'string') {
+      wrapUp = streamResult.trim();
+    } else {
+      for await (const delta of parseSSEStream(streamResult)) {
+        if (delta.type === 'content') {
+          wrapUp += delta.text;
+        }
+      }
+      wrapUp = wrapUp.trim();
+    }
+    if (!wrapUp) wrapUp = 'Cuộc thảo luận đã kết thúc.';
 
     await poolService.addMessage(poolId, {
       agentId: 'mindx',
@@ -455,13 +465,15 @@ export async function handleMeetingLoop(poolId: string): Promise<void> {
           const doc = agentMap.get(agentId);
           if (!doc) return { agentId, shouldSpeak: false };
           const relevanceStart = Date.now();
-          // Truncate latest message to avoid overwhelming the relevance-check model
+          // Truncate both inputs to avoid overwhelming the relevance-check model
+          // (MiniMax abab6.5s-chat returns empty when context is too large)
           const latestSnippet = freshLatest.content.slice(0, 800);
+          const contextSnippet = freshContext.slice(0, 1500);
           const shouldSpeak = await runRelevanceCheck(
             agentId,
             doc.specialty,
             latestSnippet,
-            freshContext
+            contextSnippet
           );
           logMeetingInfo(poolId, 'relevance_check', `Relevance check for agent ${doc.name}`, {
             agentId,
