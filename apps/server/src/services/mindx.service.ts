@@ -280,9 +280,6 @@ export async function handleMeetingLoop(poolId: string): Promise<void> {
     const latestMessages = await Message.find({ poolId }).sort({ timestamp: -1 }).limit(5);
     if (latestMessages.length === 0) return;
 
-    const latestMessage = latestMessages[0]!;
-    const poolContext = [...latestMessages].reverse().map((m) => `[${m.agentId}]: ${m.content}`).join('\n');
-
     // Pop next speaker (FIFO)
     const nextAgentId = await queueManager.popFromQueue();
     let agentSpoke = false;
