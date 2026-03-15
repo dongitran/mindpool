@@ -49,5 +49,5 @@ jobs:
           POD=$(kubectl -n mindpool get pod -l app=api -o jsonpath='{.items[0].metadata.name}')
           echo "Target pod: $POD"
           echo "Mode: ${{ inputs.mode }}"
-          kubectl -n mindpool cp /tmp/seed-db.js $POD:/tmp/seed-db.js
-          kubectl -n mindpool exec $POD -- sh -c 'cd /app && SEED_MODE="${{ inputs.mode }}" node /tmp/seed-db.js'
+          kubectl -n mindpool cp /tmp/seed-db.js $POD:/app/seed-db.js
+          kubectl -n mindpool exec $POD -- sh -c 'SEED_MODE="${{ inputs.mode }}" node /app/seed-db.js && rm /app/seed-db.js'
