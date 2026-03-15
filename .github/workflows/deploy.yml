@@ -164,6 +164,7 @@ jobs:
         env:
           BASE_URL: https://${{ secrets.MINDPOOL_HOST }}
           CI: 'true'
+          MEETING_E2E: 'true'
         run: npx playwright test
 
       - name: Upload Playwright report

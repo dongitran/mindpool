@@ -161,18 +161,16 @@ test.describe('Full Meeting E2E Flow', () => {
     await expect(poolItem).toBeVisible({ timeout: 10_000 });
     await poolItem.click();
 
-    // Wait for SSE to connect and replay agent states, then screenshot for evidence
-    await page.waitForTimeout(5_000);
+    // Wait for SSE to connect and replay agent states + worker to pick up job.
+    // Worker uses BLPOP with 5s timeout — worst case needs ~7s to start speaking.
+    await page.waitForTimeout(10_000);
     await page.screenshot({ path: 'screenshots/4b-meeting-state.png', fullPage: true });
 
-    // Tight timeout (5s) is CRITICAL — ensures typing indicator comes from SSE REPLAY,
-    // not from a later agent turn starting via real-time events (which masks the bug).
-    // First agent speaks 15-30s, so no second agent starts within 10s total.
-    // BUG: SSE replay sends agent_state (sidebar only) → no typing indicator in chat
-    // FIX: SSE replay sends agent_typing → typing indicator with "đang phát biểu..."
+    // Worker BLPOP can take up to 5s to pick up job + ~200ms to broadcast agent_typing.
+    // Use 15s timeout to account for worst-case BLPOP + SSE propagation delay.
     await expect(
       page.getByText('đang phát biểu...').first()
-    ).toBeVisible({ timeout: 5_000 });
+    ).toBeVisible({ timeout: 15_000 });
   });
 
   // ── 5. Meeting completes ──────────────────────────────────────────────────
