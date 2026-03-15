@@ -149,6 +149,32 @@ test.describe('Full Meeting E2E Flow', () => {
     console.log(`[Meeting E2E] Pool created: ${poolId}`);
   });
 
+  // ── 4b. Typing indicator visible when joining active meeting ─────────────
+  test('4b. Typing indicator visible when joining active meeting', async ({ page }) => {
+    test.setTimeout(30_000);
+
+    // Navigate to frontend — pool vừa tạo ở test 4 phải xuất hiện trong sidebar
+    await page.goto('/');
+
+    // Click vào pool active trong sidebar
+    const poolItem = page.getByText('Chiến lược định giá SaaS B2B Việt Nam').first();
+    await expect(poolItem).toBeVisible({ timeout: 10_000 });
+    await poolItem.click();
+
+    // Wait for SSE to connect and replay agent states, then screenshot for evidence
+    await page.waitForTimeout(5_000);
+    await page.screenshot({ path: 'screenshots/4b-meeting-state.png', fullPage: true });
+
+    // Tight timeout (5s) is CRITICAL — ensures typing indicator comes from SSE REPLAY,
+    // not from a later agent turn starting via real-time events (which masks the bug).
+    // First agent speaks 15-30s, so no second agent starts within 10s total.
+    // BUG: SSE replay sends agent_state (sidebar only) → no typing indicator in chat
+    // FIX: SSE replay sends agent_typing → typing indicator with "đang phát biểu..."
+    await expect(
+      page.getByText('đang phát biểu...').first()
+    ).toBeVisible({ timeout: 5_000 });
+  });
+
   // ── 5. Meeting completes ──────────────────────────────────────────────────
   test('5. Meeting runs to completion — agent turns + wrapup', async ({ request }) => {
     test.setTimeout(900_000); // 15 min upper bound

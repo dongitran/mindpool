@@ -296,8 +296,30 @@ describe('meetingStore', () => {
   });
 
   describe('setCurrentPool', () => {
-    it('should set pool and reset messages', () => {
+    const makePool = (id: string, topic = 'Test topic') => ({
+      _id: id,
+      title: 'Test',
+      topic,
+      status: 'active' as const,
+      agents: [],
+      messages: [],
+      queue: [],
+      conversationId: '',
+      statusText: '',
+      duration: 0,
+      sendAgents: [],
+      mapCenter: '',
+      mapCenterSub: '',
+      mapNodes: [],
+      createdAt: '',
+      updatedAt: '',
+    });
+
+    it('should set pool and reset messages when switching pools', () => {
       const store = useMeetingStore.getState();
+
+      // Set initial pool
+      store.setCurrentPool('pool-1', makePool('pool-1'));
 
       // Add existing message
       store.addMessage({
@@ -306,31 +328,80 @@ describe('meetingStore', () => {
         timestamp: '2024-01-01T00:00:00Z',
       });
 
-      const pool = {
-        _id: 'pool-2',
-        title: 'New',
-        topic: 'New topic',
-        status: 'active' as const,
-        agents: [],
-        messages: [],
-        queue: [],
-        conversationId: '',
-        statusText: '',
-        duration: 0,
-        sendAgents: [],
-        mapCenter: '',
-        mapCenterSub: '',
-        mapNodes: [],
-        createdAt: '',
-        updatedAt: '',
-      };
-
-      store.setCurrentPool('pool-2', pool);
+      // Switch to different pool
+      store.setCurrentPool('pool-2', makePool('pool-2', 'New topic'));
 
       const state = useMeetingStore.getState();
       expect(state.currentPoolId).toBe('pool-2');
       expect(state.pool?.topic).toBe('New topic');
-      expect(state.messages).toHaveLength(0); // Messages reset
+      expect(state.messages).toHaveLength(0); // Messages wiped on pool switch
+    });
+
+    it('should NOT wipe messages on initial load (race condition fix)', () => {
+      const store = useMeetingStore.getState();
+
+      // Simulate SSE replay arriving BEFORE pool fetch resolves:
+      // 1. SSE adds a typing indicator
+      store.addMessage({
+        type: 'typing',
+        agentId: 'agent-1',
+        agentName: 'Business',
+        icon: '💼',
+        content: '',
+        timestamp: '2024-01-01T00:00:00Z',
+      });
+
+      expect(useMeetingStore.getState().messages).toHaveLength(1);
+
+      // 2. Pool fetch resolves → setCurrentPool called with currentPoolId=null
+      store.setCurrentPool('pool-1', makePool('pool-1'));
+
+      // Messages should NOT be wiped — SSE-replayed typing indicator preserved
+      const state = useMeetingStore.getState();
+      expect(state.currentPoolId).toBe('pool-1');
+      expect(state.messages).toHaveLength(1);
+      expect(state.messages[0].type).toBe('typing');
+    });
+
+    it('should NOT wipe messages when re-setting same pool', () => {
+      const store = useMeetingStore.getState();
+      const pool = makePool('pool-1');
+
+      store.setCurrentPool('pool-1', pool);
+      store.addMessage({
+        type: 'agent',
+        agentId: 'agent-1',
+        content: 'Hello',
+        timestamp: '2024-01-01T00:00:00Z',
+      });
+
+      // Same pool re-set (e.g. refetch)
+      store.setCurrentPool('pool-1', pool);
+
+      expect(useMeetingStore.getState().messages).toHaveLength(1);
+    });
+
+    it('should wipe messages when switching to a DIFFERENT pool', () => {
+      const store = useMeetingStore.getState();
+
+      store.setCurrentPool('pool-1', makePool('pool-1'));
+      store.addMessage({
+        type: 'agent',
+        agentId: 'agent-1',
+        content: 'Hello from pool 1',
+        timestamp: '2024-01-01T00:00:00Z',
+      });
+      store.updateAgentState('agent-1', 'speaking');
+      store.updateQueue([{ agentId: 'agent-1', position: 1 }]);
+
+      // Switch to different pool
+      store.setCurrentPool('pool-2', makePool('pool-2'));
+
+      const state = useMeetingStore.getState();
+      expect(state.messages).toHaveLength(0);
+      expect(state.streamingChunks).toEqual({});
+      expect(state.agentStates).toEqual({});
+      expect(state.queue).toEqual([]);
     });
   });
 
