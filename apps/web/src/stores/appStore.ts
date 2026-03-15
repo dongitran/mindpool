@@ -26,13 +26,27 @@ export const useAppStore = create<AppState>((set) => ({
   initialSetupTopic: null,
   error: null,
 
-  setScreen: (screen) => set({ currentScreen: screen }),
-  setCurrentConversation: (id) => set({ currentConversationId: id }),
+  setScreen: (screen) => {
+    set({ currentScreen: screen });
+    if ((screen === 'welcome' || screen === 'history' || screen === 'settings') && window.location.pathname !== '/') {
+      history.pushState(null, '', '/');
+    }
+  },
+  setCurrentConversation: (id) => {
+    set({ currentConversationId: id });
+    if (id) history.replaceState(null, '', `/chat/${id}`);
+  },
   setCurrentMeeting: (id) => set({ currentMeetingId: id }),
-  navigateToMeeting: (meetingId) =>
-    set({ currentScreen: 'meeting', currentMeetingId: meetingId }),
-  navigateToSetup: (conversationId) =>
-    set({ currentScreen: 'setup', currentConversationId: conversationId || null }),
+  navigateToMeeting: (meetingId) => {
+    set({ currentScreen: 'meeting', currentMeetingId: meetingId });
+    const target = `/meeting/${meetingId}`;
+    if (window.location.pathname !== target) history.pushState(null, '', target);
+  },
+  navigateToSetup: (conversationId) => {
+    set({ currentScreen: 'setup', currentConversationId: conversationId || null });
+    const target = conversationId ? `/chat/${conversationId}` : '/chat/new';
+    if (window.location.pathname !== target) history.pushState(null, '', target);
+  },
   setInitialSetupTopic: (topic) => set({ initialSetupTopic: topic }),
   setError: (error) => set({ error }),
   clearError: () => set({ error: null }),

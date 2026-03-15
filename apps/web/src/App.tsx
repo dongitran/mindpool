@@ -48,7 +48,7 @@ function ErrorBanner() {
 }
 
 export default function App() {
-  const { setError } = useAppStore();
+  const { setError, setScreen, navigateToMeeting, navigateToSetup } = useAppStore();
   const { data: conversations = [], error: convError } = useConversations();
   const { data: pools = [], error: poolsError } = usePools();
 
@@ -57,6 +57,25 @@ export default function App() {
       setError('Không thể tải dữ liệu server');
     }
   }, [convError, poolsError, setError]);
+
+  // Restore screen from URL on mount + handle browser back/forward
+  useEffect(() => {
+    function handlePath(path: string) {
+      const meetingMatch = path.match(/^\/meeting\/([a-f0-9]+)$/);
+      const chatMatch = path.match(/^\/chat\/([a-f0-9]+)$/);
+      if (meetingMatch) navigateToMeeting(meetingMatch[1]);
+      else if (chatMatch) navigateToSetup(chatMatch[1]);
+      else if (path === '/chat/new') navigateToSetup();
+      else setScreen('welcome');
+    }
+
+    handlePath(window.location.pathname);
+
+    const onPopState = () => handlePath(window.location.pathname);
+    window.addEventListener('popstate', onPopState);
+    return () => window.removeEventListener('popstate', onPopState);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   return (
     <div className="flex w-full h-screen overflow-hidden bg-bg text-text">

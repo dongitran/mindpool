@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { useStreamingQueue } from '../../hooks/useStreamingQueue';
@@ -50,14 +50,28 @@ function formatTime(ts: string) {
 
 export function DiscussionFeed({ messages, showThinkingDefault = false }: DiscussionFeedProps) {
   const feedRef = useRef<HTMLDivElement>(null);
+  const [showScrollBtn, setShowScrollBtn] = useState(false);
 
-  // Scroll to bottom when a new message arrives or streaming content updates
+  // Track scroll position to show/hide scroll-to-bottom button
+  useEffect(() => {
+    const el = feedRef.current;
+    if (!el) return;
+    const onScroll = () => {
+      const gap = el.scrollHeight - el.scrollTop - el.clientHeight;
+      setShowScrollBtn(gap > 100);
+    };
+    el.addEventListener('scroll', onScroll);
+    return () => el.removeEventListener('scroll', onScroll);
+  }, []);
+
+  // Re-check when messages change (new message or streaming chunk arrives)
   const lastMsg = messages[messages.length - 1];
   const scrollTrigger = `${messages.length}-${lastMsg?.content?.length ?? 0}-${lastMsg?.thinking?.length ?? 0}`;
   useEffect(() => {
-    if (feedRef.current) {
-      feedRef.current.scrollTop = feedRef.current.scrollHeight;
-    }
+    const el = feedRef.current;
+    if (!el) return;
+    const gap = el.scrollHeight - el.scrollTop - el.clientHeight;
+    setShowScrollBtn(gap > 100);
   }, [scrollTrigger]);
 
   const displayedMessages = useStreamingQueue(messages, 20);
@@ -65,7 +79,7 @@ export function DiscussionFeed({ messages, showThinkingDefault = false }: Discus
   return (
     <div
       ref={feedRef}
-      className="flex-1 overflow-y-auto px-[22px] py-[18px] scrollbar-thin"
+      className="flex-1 overflow-y-auto px-[22px] py-[18px] scrollbar-thin relative"
     >
       {displayedMessages.map((msg, i) => {
         const msgKey = msg.id || `${msg.timestamp}-${msg.type}-${i}`;
@@ -163,6 +177,16 @@ export function DiscussionFeed({ messages, showThinkingDefault = false }: Discus
           </div>
         );
       })}
+      {showScrollBtn && (
+        <div className="sticky bottom-4 flex justify-end pointer-events-none">
+          <button
+            onClick={() => feedRef.current?.scrollTo({ top: feedRef.current.scrollHeight, behavior: 'smooth' })}
+            className="pointer-events-auto w-8 h-8 rounded-full bg-surface-2 border border-accent flex items-center justify-center text-accent hover:bg-accent hover:text-surface transition-all shadow-lg mr-2"
+          >
+            ↓
+          </button>
+        </div>
+      )}
     </div>
   );
 }
