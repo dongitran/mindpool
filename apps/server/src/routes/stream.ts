@@ -86,7 +86,16 @@ router.get('/:poolId', async (req: Request<{ poolId: string }>, res: Response) =
     const pool = await Pool.findById(poolId);
     if (pool) {
       for (const agent of pool.agents) {
-        if (agent.state && agent.state !== 'listening') {
+        if (agent.state === 'speaking') {
+          // Send agent_typing so late-joining clients see the typing indicator in chat
+          res.write(`data: ${JSON.stringify({
+            type: 'agent_typing',
+            agentId: agent.agentId,
+            agentName: agent.name,
+            icon: agent.icon,
+            role: agent.role,
+          })}\n\n`);
+        } else if (agent.state && agent.state !== 'listening') {
           res.write(`data: ${JSON.stringify({ type: 'agent_state', agentId: agent.agentId, state: agent.state })}\n\n`);
         }
       }

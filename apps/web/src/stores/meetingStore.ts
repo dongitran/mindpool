@@ -28,6 +28,7 @@ interface MeetingState {
   addMessage: (message: MeetingMessage) => void;
   appendChunk: (agentId: string, agentName: string, icon: string, chunk: string) => void;
   updateTypingMessage: (agentId: string, thinking: string, thinkSec: number) => void;
+  appendThinkingChunk: (agentId: string, chunk: string, thinkSec: number) => void;
   updateAgentState: (agentId: string, state: string) => void;
   updateQueue: (queue: { agentId: string; position: number }[]) => void;
   setPoolComplete: (wrapUp: string) => void;
@@ -45,12 +46,16 @@ export const useMeetingStore = create<MeetingState>((set) => ({
   isLoading: false,
 
   setCurrentPool: (poolId, pool) =>
-    set({
+    set((s) => ({
       currentPoolId: poolId,
       pool,
-      messages: [],
+      // Only wipe messages when switching to a DIFFERENT pool.
+      // On initial load (currentPoolId=null) or same pool: preserve SSE-replayed messages.
+      ...(s.currentPoolId && s.currentPoolId !== poolId
+        ? { messages: [], streamingChunks: {}, agentStates: {}, queue: [] }
+        : {}),
       isLoading: false,
-    }),
+    })),
   addMessage: (message) =>
     set((s) => {
       const msgWithId = { ...message, id: message.id || crypto.randomUUID() };
@@ -94,6 +99,14 @@ export const useMeetingStore = create<MeetingState>((set) => ({
       messages: s.messages.map((m) =>
         m.type === 'typing' && m.agentId === agentId
           ? { ...m, thinking, thinkSec }
+          : m
+      ),
+    })),
+  appendThinkingChunk: (agentId, chunk, thinkSec) =>
+    set((s) => ({
+      messages: s.messages.map((m) =>
+        m.type === 'typing' && m.agentId === agentId
+          ? { ...m, thinking: (m.thinking || '') + chunk, thinkSec }
           : m
       ),
     })),

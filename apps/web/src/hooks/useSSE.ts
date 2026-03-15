@@ -5,7 +5,7 @@ import { api } from '../lib/api';
 export function useSSE(poolId: string | null) {
   const esRef = useRef<EventSource | null>(null);
   const lastTimestampRef = useRef<string | undefined>(undefined);
-  const { addMessage, appendChunk, updateTypingMessage, updateAgentState, updateQueue, setPoolComplete } =
+  const { addMessage, appendChunk, appendThinkingChunk, updateTypingMessage, updateAgentState, updateQueue, setPoolComplete } =
     useMeetingStore((s) => s);
 
   useEffect(() => {
@@ -83,9 +83,8 @@ export function useSSE(poolId: string | null) {
               });
               break;
             case 'agent_thinking':
-              // Fallback: update typing indicator if a separate thinking event arrives
-              // Primary path: thinking data is now sent directly in agent_message
-              updateTypingMessage(data.agentId, data.content, data.thinkSec);
+              // Append thinking chunk to typing message (streamed during LLM reasoning phase)
+              appendThinkingChunk(data.agentId, data.content, data.thinkSec);
               break;
             case 'agent_chunk':
               appendChunk(data.agentId, data.agentName, data.icon, data.chunk);
@@ -136,5 +135,5 @@ export function useSSE(poolId: string | null) {
       esRef.current?.close();
       esRef.current = null;
     };
-  }, [poolId, addMessage, appendChunk, updateTypingMessage, updateAgentState, updateQueue, setPoolComplete]);
+  }, [poolId, addMessage, appendChunk, appendThinkingChunk, updateTypingMessage, updateAgentState, updateQueue, setPoolComplete]);
 }

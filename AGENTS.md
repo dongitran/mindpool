@@ -111,6 +111,17 @@ pnpm --filter @mindpool/e2e exec playwright show-report
 - `BASE_URL` set → uses external server (docker compose), skips dev server startup
 - Not set → auto-starts `pnpm dev` before running tests
 
+## CI/CD Workflows
+
+| Workflow | Trigger | What it does |
+|---|---|---|
+| `ci.yml` | push master, PR | Typecheck → Lint + CSpell → Unit tests → Build → Security audit |
+| `deploy.yml` | push master | Build Docker images → Push GCR → Deploy GKE (Pulumi) → E2E tests |
+| `seed-db.yml` | manual (`workflow_dispatch`) | Seed MongoDB trên GKE — mode `upsert` (idempotent) hoặc `clear` |
+
+- E2E tests chạy trong `deploy.yml` (sau deploy), không chạy trong `ci.yml`
+- `seed-db.yml` compile TS → esbuild → kubectl cp to API pod → exec
+
 ## Environment Variables
 
 | Variable | Required | Description |

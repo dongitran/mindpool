@@ -330,6 +330,7 @@ export async function handleMeetingLoop(poolId: string): Promise<void> {
           );
 
           let content: string;
+          let accumulatedThinking = '';
 
           if (typeof streamResult === 'string') {
             // Fallback: provider returned full string (non-streaming)
@@ -339,6 +340,10 @@ export async function handleMeetingLoop(poolId: string): Promise<void> {
             let accumulated = '';
             let batchBuffer = '';
             let lastFlush = Date.now();
+            let thinkingBatchBuffer = '';
+            let lastThinkingFlush = Date.now();
+            const THINKING_BATCH_SIZE = 100;
+            const THINKING_BATCH_INTERVAL = 1000;
 
             const flushBatch = async () => {
               if (batchBuffer.length > 0) {
@@ -347,6 +352,17 @@ export async function handleMeetingLoop(poolId: string): Promise<void> {
                 );
                 batchBuffer = '';
                 lastFlush = Date.now();
+              }
+            };
+
+            const flushThinkingBatch = async () => {
+              if (thinkingBatchBuffer.length > 0) {
+                const elapsedSec = Math.round((Date.now() - startTime) / 1000);
+                await broadcastService.broadcastAgentThinking(
+                  poolId, nextAgentId, agentDoc.name, thinkingBatchBuffer, elapsedSec
+                );
+                thinkingBatchBuffer = '';
+                lastThinkingFlush = Date.now();
               }
             };
 
@@ -362,8 +378,19 @@ export async function handleMeetingLoop(poolId: string): Promise<void> {
                   });
                   break;
                 }
-                // Only accumulate content chunks; skip thinking/reasoning chunks
-                if (delta.type === 'content') {
+
+                if (delta.type === 'thinking') {
+                  accumulatedThinking += delta.text;
+                  thinkingBatchBuffer += delta.text;
+                  if (thinkingBatchBuffer.length >= THINKING_BATCH_SIZE
+                      || Date.now() - lastThinkingFlush >= THINKING_BATCH_INTERVAL) {
+                    await flushThinkingBatch();
+                  }
+                } else if (delta.type === 'content') {
+                  // Flush remaining thinking on first content chunk
+                  if (thinkingBatchBuffer) {
+                    await flushThinkingBatch();
+                  }
                   accumulated += delta.text;
                   batchBuffer += delta.text;
                 }
@@ -372,6 +399,7 @@ export async function handleMeetingLoop(poolId: string): Promise<void> {
                   await flushBatch();
                 }
               }
+              await flushThinkingBatch();
               await flushBatch();
             } catch (streamError) {
               logger.error('Stream interrupted', { agent: agentDoc.name, poolId, error: streamError });
@@ -389,7 +417,7 @@ export async function handleMeetingLoop(poolId: string): Promise<void> {
           }
 
           const thinkSec = Math.round((Date.now() - startTime) / 1000);
-          const thinking = `Analyzed context and formulated response about ${agentDoc.specialty}`;
+          const thinking = accumulatedThinking || undefined;
 
           await poolService.addMessage(poolId, { agentId: nextAgentId, content, thinkSec });
 

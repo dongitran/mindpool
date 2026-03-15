@@ -198,6 +198,102 @@ describe('meetingStore', () => {
     });
   });
 
+  describe('appendThinkingChunk', () => {
+    it('should append thinking chunks to typing message', () => {
+      const store = useMeetingStore.getState();
+
+      store.addMessage({
+        type: 'typing',
+        agentId: 'agent-1',
+        agentName: 'Business',
+        content: '',
+        timestamp: '2024-01-01T00:00:00Z',
+      });
+
+      store.appendThinkingChunk('agent-1', 'Analyzing market', 2);
+
+      let msg = useMeetingStore.getState().messages[0];
+      expect(msg.thinking).toBe('Analyzing market');
+      expect(msg.thinkSec).toBe(2);
+
+      store.appendThinkingChunk('agent-1', ' and competition...', 4);
+
+      msg = useMeetingStore.getState().messages[0];
+      expect(msg.thinking).toBe('Analyzing market and competition...');
+      expect(msg.thinkSec).toBe(4);
+    });
+
+    it('should not affect non-typing messages', () => {
+      const store = useMeetingStore.getState();
+
+      store.addMessage({
+        type: 'agent',
+        agentId: 'agent-1',
+        content: 'Original content',
+        timestamp: '2024-01-01T00:00:00Z',
+      });
+
+      store.appendThinkingChunk('agent-1', 'thinking chunk', 3);
+
+      const msg = useMeetingStore.getState().messages[0];
+      expect(msg.thinking).toBeUndefined();
+    });
+
+    it('should only affect the correct agent', () => {
+      const store = useMeetingStore.getState();
+
+      store.addMessage({
+        type: 'typing',
+        agentId: 'agent-1',
+        content: '',
+        timestamp: '2024-01-01T00:00:00Z',
+      });
+
+      store.addMessage({
+        type: 'typing',
+        agentId: 'agent-2',
+        content: '',
+        timestamp: '2024-01-01T00:00:01Z',
+      });
+
+      store.appendThinkingChunk('agent-1', 'deep analysis', 5);
+
+      const messages = useMeetingStore.getState().messages;
+      expect(messages[0].thinking).toBe('deep analysis');
+      expect(messages[1].thinking).toBeUndefined();
+    });
+
+    it('should allow agent message to inherit accumulated thinking', () => {
+      const store = useMeetingStore.getState();
+
+      store.addMessage({
+        type: 'typing',
+        agentId: 'agent-1',
+        agentName: 'Business',
+        icon: '💼',
+        content: '',
+        timestamp: '2024-01-01T00:00:00Z',
+      });
+
+      store.appendThinkingChunk('agent-1', 'Deep ', 2);
+      store.appendThinkingChunk('agent-1', 'market analysis...', 5);
+
+      // Agent message arrives without thinking — should inherit accumulated
+      store.addMessage({
+        type: 'agent',
+        agentId: 'agent-1',
+        agentName: 'Business',
+        content: 'Here is my analysis',
+        timestamp: '2024-01-01T00:00:06Z',
+      });
+
+      const msg = useMeetingStore.getState().messages[0];
+      expect(msg.type).toBe('agent');
+      expect(msg.thinking).toBe('Deep market analysis...');
+      expect(msg.thinkSec).toBe(5);
+    });
+  });
+
   describe('updateAgentState', () => {
     it('should set agent state', () => {
       const store = useMeetingStore.getState();
