@@ -81,7 +81,9 @@ app.use('/api', apiRouter);
 app.use(errorHandler);
 
 // Health check — verifies DB + Redis connectivity
-app.get('/health', async (_req, res) => {
+// /health: used by K8s liveness/readiness probes (internal pod port)
+// /api/health: accessible via Ingress for E2E tests hitting the frontend URL
+app.get(['/health', '/api/health'], async (_req, res) => {
   const dbState = mongoose.connection.readyState;
   if (dbState !== 1) {
     res.status(503).json({ status: 'unhealthy', db: 'disconnected', timestamp: new Date().toISOString() });

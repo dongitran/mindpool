@@ -52,7 +52,7 @@ test.describe('Full Meeting E2E Flow', () => {
 
   // ── 1. Health ─────────────────────────────────────────────────────────────
   test('1. Server health check', async ({ request }) => {
-    const res = await request.get('/health');
+    const res = await request.get('/api/health');
     expect(res.ok(), 'Server should be healthy').toBeTruthy();
 
     const data = (await res.json()) as Record<string, string>;
