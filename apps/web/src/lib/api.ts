@@ -15,8 +15,10 @@ export const api = {
   // Conversations
   createConversation: () =>
     request<Conversation>('/conversations', { method: 'POST' }),
-  getConversations: () =>
-    request<Conversation[]>('/conversations'),
+  getConversations: (cursor?: string) =>
+    request<{ items: Conversation[]; nextCursor: string | null }>(
+      `/conversations${cursor ? `?cursor=${encodeURIComponent(cursor)}` : ''}`
+    ),
   getConversation: (id: string) =>
     request<Conversation>(`/conversations/${id}`),
   sendConversationMessage: (id: string, content: string) =>
@@ -87,8 +89,10 @@ export const api = {
     }),
   getPool: (id: string) =>
     request<Pool>(`/pool/${id}`),
-  getPools: () =>
-    request<Pool[]>('/pools'),
+  getPools: (cursor?: string) =>
+    request<{ items: Pool[]; nextCursor: string | null }>(
+      `/pools${cursor ? `?cursor=${encodeURIComponent(cursor)}` : ''}`
+    ),
   sendPoolMessage: (id: string, content: string) =>
     request<{ _id: string; content: string; agentId: string; timestamp: string }>(`/pool/${id}/message`, {
       method: 'POST',

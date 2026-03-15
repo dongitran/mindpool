@@ -110,9 +110,9 @@ test.describe.serial('Server API Endpoints', () => {
     if (!poolId) {
       const listRes = await request.get('/api/pools');
       expect(listRes.ok(), 'GET /api/pools should succeed').toBeTruthy();
-      const pools = await listRes.json() as Array<{ _id: string }>;
-      expect(pools.length, 'At least one pool should exist in the system').toBeGreaterThan(0);
-      poolId = pools[0]._id;
+      const body = await listRes.json() as { items: Array<{ _id: string }> };
+      expect(body.items.length, 'At least one pool should exist in the system').toBeGreaterThan(0);
+      poolId = body.items[0]._id;
       console.log(`[server-api] No poolId from previous test, using existing pool: ${poolId}`);
     }
 

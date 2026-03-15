@@ -20,6 +20,15 @@ app.use((err: unknown, _req: unknown, res: express.Response, _next: unknown) => 
     res.status(500).json({ error: (err as Error).message });
 });
 
+vi.mock('../../lib/logger', () => ({
+    logger: { error: vi.fn(), info: vi.fn(), warn: vi.fn(), debug: vi.fn() },
+}));
+
+vi.mock('../../lib/meetingLogger', () => ({
+    logMeetingInfo: vi.fn(),
+    logMeetingError: vi.fn(),
+}));
+
 // Mock the mindxService used by the routes
 vi.mock('../../services/mindx.service', () => {
     return {
@@ -34,14 +43,14 @@ vi.mock('../../services/mindx.service', () => {
     };
 });
 
-// Mock the poolService used by the routes
-vi.mock('../../services/pool.service', () => {
+// Mock the DI module that the route actually imports
+vi.mock('../../di', () => {
     return {
-        buildPoolService: vi.fn(() => ({
-            getPool: vi.fn().mockResolvedValue({ _id: 'pool-1', title: 'Test Pool', status: 'active', agents: [{ _id: 'agent-1' }] }),
-            createUserMessage: vi.fn().mockResolvedValue({ _id: 'msg-1', content: 'hello', timestamp: new Date() }),
-            addMessage: vi.fn().mockResolvedValue({ _id: 'msg-1', content: 'hello', timestamp: new Date() }),
-        }))
+        poolService: {
+            getPool: vi.fn().mockResolvedValue({ _id: 'bbbbbbbbbbbbbbbbbbbbbbbb', title: 'Test Pool', status: 'active', agents: [{ _id: 'agent-1' }] }),
+            createUserMessage: vi.fn().mockResolvedValue({ _id: 'cccccccccccccccccccccccc', content: 'hello', timestamp: new Date() }),
+            addMessage: vi.fn().mockResolvedValue({ _id: 'cccccccccccccccccccccccc', content: 'hello', timestamp: new Date() }),
+        },
     };
 });
 
@@ -62,7 +71,7 @@ describe('Integration: POST /pool/:id/message', () => {
 
     it('QC Test: should handle empty content gracefully (validation boundary)', async () => {
         const response = await request(app)
-            .post('/pool/pool-1/message')
+            .post('/pool/bbbbbbbbbbbbbbbbbbbbbbbb/message')
             .send({ content: '' });
 
         // Ensure the backend catches the validation error before creating a message
@@ -72,17 +81,17 @@ describe('Integration: POST /pool/:id/message', () => {
 
     it('QC Test: should correctly process valid message and add user to meeting queue', async () => {
         const response = await request(app)
-            .post('/pool/pool-1/message')
+            .post('/pool/bbbbbbbbbbbbbbbbbbbbbbbb/message')
             .send({ content: 'Hello agents' });
 
         expect(response.status).toBe(200);
-        expect(response.body).toHaveProperty('_id', 'msg-1');
+        expect(response.body).toHaveProperty('_id', 'cccccccccccccccccccccccc');
 
         // Assert redis push happened for the queue worker with exact key and payload pattern
         const { redis, MEETING_QUEUE_KEY } = await import('../../lib/redis');
         expect(redis.rpush).toHaveBeenCalledWith(
             MEETING_QUEUE_KEY,
-            expect.stringContaining('"poolId":"pool-1"')
+            expect.stringContaining('"poolId":"bbbbbbbbbbbbbbbbbbbbbbbb"')
         );
     });
 });

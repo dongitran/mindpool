@@ -280,7 +280,7 @@ function ToggleRow({ label, desc, checked, onChange }: { label: string; desc: st
         <div className="text-[13px] font-semibold text-text">{label}</div>
         <div className="text-[11.5px] text-text-muted leading-relaxed">{desc}</div>
       </div>
-      <Toggle checked={checked} onChange={onChange} />
+      <Toggle checked={checked} onChange={onChange} label={label} />
     </div>
   );
 }

@@ -3,6 +3,7 @@ import type { Request, Response } from 'express';
 import { Message, Pool } from '../models';
 import { logger } from '../lib/logger';
 import { redisSub } from '../lib/redis';
+import { validateObjectId } from '../middleware/validate';
 
 const router = Router();
 
@@ -11,6 +12,18 @@ const poolConnections = new Map<string, Set<Response>>();
 
 // Pool IDs we are currently subscribed to in Redis
 const subscribedPools = new Set<string>();
+
+// Periodic cleanup: remove empty entries from poolConnections every 5 minutes
+setInterval(() => {
+  for (const [poolId, connections] of poolConnections) {
+    if (connections.size === 0) {
+      poolConnections.delete(poolId);
+      maybeUnsubscribePoolChannel(poolId).catch(err =>
+        logger.error('Cleanup unsubscribe failed', { poolId, error: err })
+      );
+    }
+  }
+}, 5 * 60 * 1000);
 
 // Forward Redis Pub/Sub messages to all SSE clients for that pool
 redisSub.on('message', (channel: string, data: string) => {
@@ -47,7 +60,7 @@ async function maybeUnsubscribePoolChannel(poolId: string): Promise<void> {
 }
 
 // GET /stream/:poolId — SSE connection
-router.get('/:poolId', async (req: Request<{ poolId: string }>, res: Response) => {
+router.get('/:poolId', validateObjectId('poolId'), async (req: Request<{ poolId: string }>, res: Response) => {
   const { poolId } = req.params;
 
   res.setHeader('Content-Type', 'text/event-stream');

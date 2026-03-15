@@ -22,7 +22,8 @@ export type MeetingEvent =
   | 'wrapup_complete'
   | 'wrapup_error'
   | 'meeting_completed'
-  | 'user_message';
+  | 'user_message'
+  | 'zombie_recovery';
 
 export type MeetingLogLevel = 'info' | 'warn' | 'error';
 
@@ -44,7 +45,7 @@ const MEETING_EVENTS: MeetingEvent[] = [
   'relevance_check', 'agent_queued',
   'stop_signal_detected', 'force_round_robin', 'max_empty_rounds',
   'wrapup_start', 'wrapup_complete', 'wrapup_error', 'meeting_completed',
-  'user_message',
+  'user_message', 'zombie_recovery',
 ];
 
 const MeetingLogSchema = new Schema(

@@ -4,7 +4,9 @@ import { llmRouter, analyzeTopicAndSuggestAgents, generateConversationTitle } fr
 import { parseSSEStream } from '../llm/stream-parser';
 import type { ChatMessage } from '@mindpool/shared';
 import { logger } from '../lib/logger';
-import { validate } from '../middleware/validate';
+import { validate, validateObjectId } from '../middleware/validate';
+import { ApiError } from '../middleware/errorHandler';
+import { parseCursorFilter, buildCursor } from '../lib/pagination';
 import {
   createConversationSchema,
   sendConversationMessageSchema,
@@ -36,26 +38,33 @@ router.post('/', validate(createConversationSchema), async (req, res, next) => {
   }
 });
 
-// GET /conversations — list all conversations
-router.get('/', async (_req, res, next) => {
+// GET /conversations — list conversations (cursor-based pagination, sorted by updatedAt)
+router.get('/', async (req, res, next) => {
   try {
-    const conversations = await Conversation.find()
-      .sort({ updatedAt: -1 })
+    const limit = Math.min(Math.max(parseInt(req.query.limit as string) || 20, 1), 100);
+    const cursor = req.query.cursor as string | undefined;
+    const filter = parseCursorFilter(cursor);
+    const items = await Conversation.find(filter)
+      .sort({ updatedAt: -1, _id: -1 })
+      .limit(limit + 1)
       .select('title sub createdAt updatedAt');
-    res.json(conversations);
+    const hasMore = items.length > limit;
+    if (hasMore) items.pop();
+    const last = items[items.length - 1];
+    res.json({
+      items,
+      nextCursor: hasMore && last ? buildCursor(last) : null,
+    });
   } catch (error) {
     next(error);
   }
 });
 
 // GET /conversations/:id — get conversation by id
-router.get('/:id', async (req, res, next) => {
+router.get('/:id', validateObjectId(), async (req, res, next) => {
   try {
     const conversation = await Conversation.findById(req.params.id);
-    if (!conversation) {
-      res.status(404).json({ error: { message: 'Conversation not found' } });
-      return;
-    }
+    if (!conversation) throw ApiError.notFound('Conversation not found');
     res.json(conversation);
   } catch (error) {
     next(error);
@@ -63,13 +72,10 @@ router.get('/:id', async (req, res, next) => {
 });
 
 // POST /conversations/:id/message — send user message, stream MindX reply via SSE
-router.post('/:id/message', validate(sendConversationMessageSchema), async (req, res, next) => {
+router.post('/:id/message', validateObjectId(), validate(sendConversationMessageSchema), async (req, res, next) => {
   try {
     const conversation = await Conversation.findById(req.params.id);
-    if (!conversation) {
-      res.status(404).json({ error: { message: 'Conversation not found' } });
-      return;
-    }
+    if (!conversation) throw ApiError.notFound('Conversation not found');
 
     // Try to generate title if still using default — retries every exchange until context is sufficient
     const needsTitle = conversation.title === 'Cuộc trò chuyện mới';
@@ -171,6 +177,8 @@ router.post('/:id/message', validate(sendConversationMessageSchema), async (req,
         };
 
         const sentAgentIds = new Set<string>();
+        // Pre-build agent cache from selectable agents to avoid N+1 queries
+        const agentCache = new Map(selectableAgents.map((a) => [a._id.toString(), a]));
 
         try {
           for await (const chunk of parseSSEStream(streamResult)) {
@@ -186,22 +194,18 @@ router.post('/:id/message', validate(sendConversationMessageSchema), async (req,
                 const agentId = agentTagMatch[1].trim();
                 if (sentAgentIds.has(agentId)) continue;
                 sentAgentIds.add(agentId);
-                try {
-                  const foundAgent = await Agent.findById(agentId);
-                  if (foundAgent) {
-                    safeWrite(`data: ${JSON.stringify({
-                      type: 'agents_suggested',
-                      agents: [{
-                        agentId: foundAgent._id.toString(),
-                        icon: foundAgent.icon,
-                        name: foundAgent.name,
-                        desc: foundAgent.specialty,
-                        checked: true,
-                      }],
-                    })}\n\n`);
-                  }
-                } catch (err) {
-                  logger.error('Agent suggestion lookup failed', { error: err, agentId });
+                const foundAgent = agentCache.get(agentId);
+                if (foundAgent) {
+                  safeWrite(`data: ${JSON.stringify({
+                    type: 'agents_suggested',
+                    agents: [{
+                      agentId: foundAgent._id.toString(),
+                      icon: foundAgent.icon,
+                      name: foundAgent.name,
+                      desc: foundAgent.specialty,
+                      checked: true,
+                    }],
+                  })}\n\n`);
                 }
               }
 
@@ -345,7 +349,7 @@ router.post('/:id/message', validate(sendConversationMessageSchema), async (req,
 });
 
 // PATCH /conversations/:id/link-meeting — persist meetingId on conversation message
-router.patch('/:id/link-meeting', async (req, res, next) => {
+router.patch('/:id/link-meeting', validateObjectId(), async (req, res, next) => {
   try {
     const { btnId, meetingId, meetingTitle } = req.body;
     if (!btnId || !meetingId) {
@@ -354,10 +358,7 @@ router.patch('/:id/link-meeting', async (req, res, next) => {
     }
 
     const conversation = await Conversation.findById(req.params.id);
-    if (!conversation) {
-      res.status(404).json({ error: { message: 'Conversation not found' } });
-      return;
-    }
+    if (!conversation) throw ApiError.notFound('Conversation not found');
 
     const messages = conversation.messages as unknown as Array<Record<string, unknown>>;
     const msgIndex = messages.findIndex((m) => m.btnId === btnId);

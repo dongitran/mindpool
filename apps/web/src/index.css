@@ -55,3 +55,12 @@ body {
   animation: typingBounce 1.2s infinite;
 }
 
+@keyframes waveBounce {
+  0%, 100% { transform: scaleY(0.4); }
+  50% { transform: scaleY(1); }
+}
+
+.animate-wave-bounce {
+  animation: waveBounce 0.8s ease-in-out infinite;
+}
+

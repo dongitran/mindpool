@@ -94,6 +94,8 @@
     "Buildx",
     "wrapup",
     "upserted",
-    "idempotently"
+    "idempotently",
+    "dedup",
+    "partialize"
   ]
 }

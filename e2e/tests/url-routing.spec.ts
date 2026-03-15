@@ -21,14 +21,14 @@ function setupMocks(page: import('@playwright/test').Page) {
       await route.fulfill({
         status: 200,
         contentType: 'application/json',
-        body: JSON.stringify([MOCK_POOL]),
+        body: JSON.stringify({ items: [MOCK_POOL], nextCursor: null }),
       });
     }),
     page.route('**/api/conversations', async (route) => {
       await route.fulfill({
         status: 200,
         contentType: 'application/json',
-        body: JSON.stringify([MOCK_CONVERSATION]),
+        body: JSON.stringify({ items: [MOCK_CONVERSATION], nextCursor: null }),
       });
     }),
     page.route(`**/api/pool/${MOCK_POOL._id}`, async (route) => {

@@ -59,6 +59,11 @@ export const useMeetingStore = create<MeetingState>((set) => ({
   addMessage: (message) =>
     set((s) => {
       const msgWithId = { ...message, id: message.id || crypto.randomUUID() };
+      // Dedup: skip if a message with the same id already exists
+      if (msgWithId.id && s.messages.some((m) => m.id === msgWithId.id)) return s;
+      // Dedup typing: only allow one typing indicator per agent
+      if (msgWithId.type === 'typing' && msgWithId.agentId &&
+          s.messages.some((m) => m.type === 'typing' && m.agentId === msgWithId.agentId)) return s;
       // When an actual agent message arrives, inherit thinking data from typing indicator, then remove it
       if (msgWithId.type === 'agent' && msgWithId.agentId) {
         const typingMsg = s.messages.find(

@@ -49,8 +49,10 @@ function ErrorBanner() {
 
 export default function App() {
   const { setError, setScreen, navigateToMeeting, navigateToSetup } = useAppStore();
-  const { data: conversations = [], error: convError } = useConversations();
-  const { data: pools = [], error: poolsError } = usePools();
+  const { data: convData, error: convError } = useConversations();
+  const { data: poolData, error: poolsError } = usePools();
+  const conversations = convData?.items ?? [];
+  const pools = poolData?.items ?? [];
 
   useEffect(() => {
     if (convError || poolsError) {

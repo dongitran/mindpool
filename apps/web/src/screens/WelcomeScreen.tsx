@@ -56,7 +56,7 @@ export function WelcomeScreen() {
         <div className="text-[11px] font-semibold uppercase tracking-[1px] text-text-dim mb-3 text-left">Gợi ý chủ đề để bắt đầu</div>
         <div className="flex flex-wrap gap-2.5">
           {TOPIC_PILLS.map((pill) => (
-            <div
+            <button
               key={pill.label}
               onClick={() => {
                 setInitialSetupTopic(pill.label);
@@ -65,7 +65,7 @@ export function WelcomeScreen() {
               className="px-3.5 py-2 bg-surface-2 border border-border-light rounded-sm text-[12px] text-text-muted cursor-pointer transition-all duration-200 flex items-center gap-2 hover:border-accent hover:text-accent hover:-translate-y-[1px]"
             >
               {pill.icon} {pill.label}
-            </div>
+            </button>
           ))}
         </div>
       </div>

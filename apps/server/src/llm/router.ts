@@ -1,9 +1,11 @@
 import type { CallType, ChatMessage, ChatOptions, RouterConfig } from '@mindpool/shared';
 import type { LLMProvider } from './types';
 import { saveLLMLog, createLoggingStream } from './logging-stream';
+import { CircuitBreaker } from './circuit-breaker';
 
 export class LLMRouter {
   private providers = new Map<string, LLMProvider>();
+  private breakers = new Map<string, CircuitBreaker>();
   private config: RouterConfig;
 
   constructor(config: RouterConfig) {
@@ -12,6 +14,9 @@ export class LLMRouter {
 
   registerProvider(provider: LLMProvider): void {
     this.providers.set(provider.id, provider);
+    if (!this.breakers.has(provider.id)) {
+      this.breakers.set(provider.id, new CircuitBreaker());
+    }
   }
 
   async agentChat(
@@ -40,8 +45,11 @@ export class LLMRouter {
       startTime: Date.now(),
     };
 
+    const breaker = this.breakers.get(routeConfig.provider);
+
     try {
-      const result = await provider.chat(messages, routeConfig.model, options);
+      const chatFn = () => provider.chat(messages, routeConfig.model, options);
+      const result = await (breaker ? breaker.execute(chatFn) : chatFn());
 
       if (typeof result === 'string') {
         // Non-streaming: log immediately (fire-and-forget)

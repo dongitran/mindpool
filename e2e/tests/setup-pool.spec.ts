@@ -8,7 +8,7 @@ test.describe('Setup Pool', () => {
       await route.fulfill({
         status: 200,
         contentType: 'application/json',
-        body: JSON.stringify([]),
+        body: JSON.stringify({ items: [], nextCursor: null }),
       });
     });
 
@@ -16,7 +16,7 @@ test.describe('Setup Pool', () => {
       await route.fulfill({
         status: 200,
         contentType: 'application/json',
-        body: JSON.stringify([]),
+        body: JSON.stringify({ items: [], nextCursor: null }),
       });
     });
   });

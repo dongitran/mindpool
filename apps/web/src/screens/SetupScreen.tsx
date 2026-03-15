@@ -249,7 +249,7 @@ export function SetupScreen() {
         });
       }
     } catch (err) {
-      console.error('DEBUG: catch error in handleSend', err);
+      console.error('handleSend failed:', err instanceof Error ? err.message : err);
       setMessages((prev) => [
         ...prev,
         {

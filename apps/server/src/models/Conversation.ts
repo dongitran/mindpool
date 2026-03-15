@@ -48,6 +48,8 @@ const ConversationSchema = new Schema(
   { timestamps: true }
 );
 
+ConversationSchema.index({ updatedAt: -1 });
+
 export const Conversation = mongoose.model<ConversationDocument>(
   'Conversation',
   ConversationSchema

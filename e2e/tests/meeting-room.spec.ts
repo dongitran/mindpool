@@ -7,9 +7,9 @@ test.describe('Meeting Room - Event Driven States', () => {
       await route.fulfill({
         status: 200,
         contentType: 'application/json',
-        body: JSON.stringify([
+        body: JSON.stringify({ items: [
           { _id: 'test-pool-123', title: 'Mock Testing Pool', status: 'active', agents: [] }
-        ]),
+        ], nextCursor: null }),
       });
     });
 
@@ -17,7 +17,7 @@ test.describe('Meeting Room - Event Driven States', () => {
       await route.fulfill({
         status: 200,
         contentType: 'application/json',
-        body: JSON.stringify([]),
+        body: JSON.stringify({ items: [], nextCursor: null }),
       });
     });
 

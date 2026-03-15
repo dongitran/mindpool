@@ -1,21 +1,28 @@
 import { useEffect, useRef } from 'react';
 import { useMeetingStore } from '../stores/meetingStore';
+import { useAppStore } from '../stores/appStore';
 import { api } from '../lib/api';
+
+const MAX_RECONNECT = 10;
 
 export function useSSE(poolId: string | null) {
   const esRef = useRef<EventSource | null>(null);
   const lastTimestampRef = useRef<string | undefined>(undefined);
+  const reconnectCountRef = useRef(0);
   const { addMessage, appendChunk, appendThinkingChunk, updateTypingMessage, updateAgentState, updateQueue, setPoolComplete } =
     useMeetingStore((s) => s);
 
   useEffect(() => {
     if (!poolId) return;
+    reconnectCountRef.current = 0;
 
     function connect(after?: string) {
       const es = api.streamPool(poolId!, after);
       esRef.current = es;
 
       es.onmessage = (event) => {
+        // Reset reconnect counter on successful message
+        reconnectCountRef.current = 0;
         try {
           const data = JSON.parse(event.data);
           const now = new Date().toISOString();
@@ -29,8 +36,10 @@ export function useSSE(poolId: string | null) {
               }
               // It's a User or an Agent message from history
               if (msg) {
+                const stableId = msg._id?.toString();
                 if (msg.agentId === 'user') {
                   addMessage({
+                    id: stableId,
                     type: 'user',
                     content: msg.content,
                     timestamp: msg.timestamp,
@@ -38,6 +47,7 @@ export function useSSE(poolId: string | null) {
                   });
                 } else if (msg.agentId === 'mindx') {
                   addMessage({
+                    id: stableId,
                     type: 'mindx',
                     icon: '🧠',
                     agentName: 'MindX',
@@ -48,6 +58,7 @@ export function useSSE(poolId: string | null) {
                   });
                 } else {
                   addMessage({
+                    id: stableId,
                     type: 'agent',
                     agentId: msg.agentId,
                     agentName: msg.agentName,
@@ -123,12 +134,19 @@ export function useSSE(poolId: string | null) {
       };
 
       es.onerror = () => {
-        // Reconnect after 3s, passing lastTimestamp so server skips already-seen messages
-      setTimeout(() => {
-        if (esRef.current === es) {
-          connect(lastTimestampRef.current);
+        es.close();
+        reconnectCountRef.current += 1;
+        if (reconnectCountRef.current > MAX_RECONNECT) {
+          useAppStore.getState().setError('Mất kết nối với server. Vui lòng tải lại trang.');
+          return;
         }
-      }, 3000);
+        // Exponential backoff: 3s, 6s, 12s, 24s... capped at 30s
+        const delay = Math.min(3000 * Math.pow(2, reconnectCountRef.current - 1), 30000);
+        setTimeout(() => {
+          if (esRef.current === es) {
+            connect(lastTimestampRef.current);
+          }
+        }, delay);
       };
     }
 

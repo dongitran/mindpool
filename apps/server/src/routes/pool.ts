@@ -4,7 +4,8 @@ import * as mindxService from '../services/mindx.service';
 import { redis, MEETING_QUEUE_KEY } from '../lib/redis';
 import { logger } from '../lib/logger';
 import { logMeetingInfo, logMeetingError } from '../lib/meetingLogger';
-import { validate } from '../middleware/validate';
+import { validate, validateObjectId } from '../middleware/validate';
+import { ApiError } from '../middleware/errorHandler';
 import { createPoolSchema, sendMessageSchema } from '@mindpool/shared';
 
 const router = Router();
@@ -69,40 +70,36 @@ router.post('/pool/create', validate(createPoolSchema), async (req, res, next) =
 });
 
 // GET /pool/:id — get pool details
-router.get('/pool/:id', async (req, res, next) => {
+router.get('/pool/:id', validateObjectId(), async (req, res, next) => {
   try {
     const pool = await poolService.getPool(req.params.id as string);
-    if (!pool) {
-      res.status(404).json({ error: { message: 'Pool not found' } });
-      return;
-    }
+    if (!pool) throw ApiError.notFound('Pool not found');
     res.json(pool);
   } catch (error) {
     next(error);
   }
 });
 
-// GET /pools — list all pools
-router.get('/pools', async (_req, res, next) => {
+// GET /pools — list all pools (supports cursor-based pagination)
+router.get('/pools', async (req, res, next) => {
   try {
-    const pools = await poolService.listPools();
-    res.json(pools);
+    const limit = Math.min(Math.max(parseInt(req.query.limit as string) || 20, 1), 100);
+    const cursor = req.query.cursor as string | undefined;
+    const result = await poolService.listPools({ limit, cursor });
+    res.json(result);
   } catch (error) {
     next(error);
   }
 });
 
 // POST /pool/:id/message — user sends a message in an active meeting
-router.post('/pool/:id/message', validate(sendMessageSchema), async (req, res, next) => {
+router.post('/pool/:id/message', validateObjectId(), validate(sendMessageSchema), async (req, res, next) => {
   try {
     const content = req.body.content as string;
 
     const poolId = req.params.id as string;
     const pool = await poolService.getPool(poolId);
-    if (!pool) {
-      res.status(404).json({ error: { message: 'Pool not found' } });
-      return;
-    }
+    if (!pool) throw ApiError.notFound('Pool not found');
 
     // Persist user message
     const message = await poolService.addMessage(poolId, { agentId: 'user', content });

@@ -13,10 +13,14 @@ export function useStreamingQueue<T extends { id?: string; type: string; content
   const [streamProgress, setStreamProgress] = useState<Record<string, number>>({});
   const progressRef = useRef<Record<string, number>>({});
 
+  // Stable ID: prefer m.id, fallback includes array index to prevent collisions
+  const getMsgId = (m: T, idx: number) =>
+    m.id || `${m.type}-${idx}-${m.content?.slice(0, 20) || ''}`;
+
   useEffect(() => {
     // Sync ref with state on mount or when messages change (to catch history skips)
-    messages.forEach(m => {
-      const msgId = m.id || JSON.stringify(m);
+    messages.forEach((m, idx) => {
+      const msgId = getMsgId(m, idx);
       if (m.skipStream && m.content) {
         progressRef.current[msgId] = m.content.length;
       }
@@ -24,14 +28,16 @@ export function useStreamingQueue<T extends { id?: string; type: string; content
   }, [messages]);
 
   useEffect(() => {
-    // Find messages that need streaming
-    const needsStream = messages.filter(m => {
+    // Find messages that need streaming, preserving original index for stable IDs
+    const needsStream: { msg: T; msgId: string }[] = [];
+    messages.forEach((m, idx) => {
       const isBotMessage = ['bot', 'bot-agents', 'agent_message', 'mindx_announce', 'agent', 'mindx'].includes(m.type);
-      if (!isBotMessage || !m.content || m.skipStream) return false;
-      
-      const msgId = m.id || JSON.stringify(m);
+      if (!isBotMessage || !m.content || m.skipStream) return;
+      const msgId = getMsgId(m, idx);
       const progress = progressRef.current[msgId] ?? 0;
-      return progress < m.content.length;
+      if (progress < m.content.length) {
+        needsStream.push({ msg: m, msgId });
+      }
     });
 
     if (needsStream.length === 0) return;
@@ -40,10 +46,9 @@ export function useStreamingQueue<T extends { id?: string; type: string; content
       let changed = false;
       const nextProgress = { ...progressRef.current };
 
-      needsStream.forEach(msg => {
-        const msgId = msg.id || JSON.stringify(msg);
+      needsStream.forEach(({ msg, msgId }) => {
         const current = nextProgress[msgId] ?? 0;
-        
+
         if (current < msg.content!.length) {
           const advance = Math.floor(Math.random() * 2) + 2;
           nextProgress[msgId] = Math.min(current + advance, msg.content!.length);
@@ -62,13 +67,13 @@ export function useStreamingQueue<T extends { id?: string; type: string; content
     return () => clearInterval(timer);
   }, [messages, speedMs]);
 
-  return messages.map(m => {
+  return messages.map((m, idx) => {
     const isBotMessage = ['bot', 'bot-agents', 'agent_message', 'mindx_announce', 'agent', 'mindx'].includes(m.type);
     if (!isBotMessage || !m.content || m.skipStream) return m;
 
-    const msgId = m.id || JSON.stringify(m);
+    const msgId = getMsgId(m, idx);
     const progress = streamProgress[msgId] ?? 0;
-    
+
     // If progress is at the end, return full message to avoid unnecessary substring ops
     if (progress >= m.content.length) return m;
 

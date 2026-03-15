@@ -31,11 +31,11 @@ async function mockPoolRoutes(page: import('@playwright/test').Page) {
     await route.fulfill({
       status: 200,
       contentType: 'application/json',
-      body: JSON.stringify(mockPoolList),
+      body: JSON.stringify({ items: mockPoolList, nextCursor: null }),
     });
   });
   await page.route('**/api/conversations', async (route) => {
-    await route.fulfill({ status: 200, contentType: 'application/json', body: '[]' });
+    await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ items: [], nextCursor: null }) });
   });
   await page.route(`**/api/pool/${POOL_ID}`, async (route) => {
     await route.fulfill({
@@ -285,11 +285,11 @@ test.describe('Meeting Thinking Indicator', () => {
       await route.fulfill({
         status: 200,
         contentType: 'application/json',
-        body: JSON.stringify(mockPoolList),
+        body: JSON.stringify({ items: mockPoolList, nextCursor: null }),
       });
     });
     await page.route('**/api/conversations', async (route) => {
-      await route.fulfill({ status: 200, contentType: 'application/json', body: '[]' });
+      await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ items: [], nextCursor: null }) });
     });
     // DELAYED pool API response — simulates pool fetch resolving AFTER SSE events
     await page.route(`**/api/pool/${POOL_ID}`, async (route) => {

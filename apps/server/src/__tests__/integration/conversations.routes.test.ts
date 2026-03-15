@@ -11,7 +11,7 @@ const { mockConversation, mockGenerateTitle, mockSuggestAgents, mockLlmChat, moc
     title: 'Cuộc trò chuyện mới',
     messages: [{ type: 'bot', time: '10:00', content: 'Hello greeting' }],
     save: mockSave,
-    _id: 'conv-1',
+    _id: 'aaaaaaaaaaaaaaaaaaaaaaaa',
   };
   return {
     mockConversation,
@@ -76,7 +76,7 @@ describe('POST /conversations/:id/message — title generation', () => {
     mockGenerateTitle.mockResolvedValue('AI Startup Strategy');
 
     await request(app)
-      .post('/conv-1/message')
+      .post('/aaaaaaaaaaaaaaaaaaaaaaaa/message')
       .send({ content: 'Analyze AI strategy for startups' })
       .expect(200);
 
@@ -86,7 +86,7 @@ describe('POST /conversations/:id/message — title generation', () => {
     );
     // Title is updated via fire-and-forget findByIdAndUpdate
     await vi.waitFor(() => {
-      expect(mockFindByIdAndUpdate).toHaveBeenCalledWith('conv-1', { title: 'AI Startup Strategy' });
+      expect(mockFindByIdAndUpdate).toHaveBeenCalledWith('aaaaaaaaaaaaaaaaaaaaaaaa', { title: 'AI Startup Strategy' });
     });
     expect(mockConversation.save).toHaveBeenCalled();
   });
@@ -96,7 +96,7 @@ describe('POST /conversations/:id/message — title generation', () => {
     mockGenerateTitle.mockResolvedValue(null);
 
     await request(app)
-      .post('/conv-1/message')
+      .post('/aaaaaaaaaaaaaaaaaaaaaaaa/message')
       .send({ content: 'Hello' })
       .expect(200);
 
@@ -108,7 +108,7 @@ describe('POST /conversations/:id/message — title generation', () => {
     mockLlmChat.mockResolvedValue('response');
 
     await request(app)
-      .post('/conv-1/message')
+      .post('/aaaaaaaaaaaaaaaaaaaaaaaa/message')
       .send({ content: 'Follow-up message' })
       .expect(200);
 
@@ -120,7 +120,7 @@ describe('POST /conversations/:id/message — title generation', () => {
     mockGenerateTitle.mockRejectedValue(new Error('LLM error'));
 
     await request(app)
-      .post('/conv-1/message')
+      .post('/aaaaaaaaaaaaaaaaaaaaaaaa/message')
       .send({ content: 'topic message' })
       .expect(200);
 
@@ -132,7 +132,7 @@ describe('POST /conversations/:id/message — title generation', () => {
     mockGenerateTitle.mockResolvedValue(null);
 
     await request(app)
-      .post('/conv-1/message')
+      .post('/aaaaaaaaaaaaaaaaaaaaaaaa/message')
       .send({ content: 'topic' })
       .expect(200);
 
@@ -145,7 +145,7 @@ describe('POST /conversations/:id/message — title generation', () => {
     mockGenerateTitle.mockResolvedValue(null);
 
     await request(app)
-      .post('/conv-1/message')
+      .post('/aaaaaaaaaaaaaaaaaaaaaaaa/message')
       .send({ content: 'Hello' })
       .expect(200);
 
@@ -160,13 +160,13 @@ describe('POST /conversations/:id/message — title generation', () => {
     mockGenerateTitle.mockResolvedValue('AI Strategy Discussion');
 
     await request(app)
-      .post('/conv-1/message')
+      .post('/aaaaaaaaaaaaaaaaaaaaaaaa/message')
       .send({ content: 'Analyze AI strategy for startups' })
       .expect(200);
 
     // Title is updated via fire-and-forget findByIdAndUpdate
     await vi.waitFor(() => {
-      expect(mockFindByIdAndUpdate).toHaveBeenCalledWith('conv-1', { title: 'AI Strategy Discussion' });
+      expect(mockFindByIdAndUpdate).toHaveBeenCalledWith('aaaaaaaaaaaaaaaaaaaaaaaa', { title: 'AI Strategy Discussion' });
     });
   });
 
@@ -176,12 +176,12 @@ describe('POST /conversations/:id/message — title generation', () => {
     mockGenerateTitle.mockResolvedValue('ML Deployment Strategies');
 
     await request(app)
-      .post('/conv-1/message')
+      .post('/aaaaaaaaaaaaaaaaaaaaaaaa/message')
       .send({ content: 'ML deployment' })
       .expect(200);
 
     await vi.waitFor(() => {
-      expect(mockFindByIdAndUpdate).toHaveBeenCalledWith('conv-1', { title: 'ML Deployment Strategies' });
+      expect(mockFindByIdAndUpdate).toHaveBeenCalledWith('aaaaaaaaaaaaaaaaaaaaaaaa', { title: 'ML Deployment Strategies' });
     });
 
     // Exchange 2: title already set → should NOT call generateTitle
@@ -191,7 +191,7 @@ describe('POST /conversations/:id/message — title generation', () => {
     mockLlmChat.mockResolvedValue('Follow up response');
 
     await request(app)
-      .post('/conv-1/message')
+      .post('/aaaaaaaaaaaaaaaaaaaaaaaa/message')
       .send({ content: 'Tell me more' })
       .expect(200);
 

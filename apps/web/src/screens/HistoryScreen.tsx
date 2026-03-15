@@ -1,16 +1,7 @@
 import { useAppStore } from '../stores/appStore';
 import { Tag } from '../components/ui/Tag';
 import { usePools } from '../hooks/useApiQueries';
-
-interface PoolCard {
-  _id: string;
-  title: string;
-  status: string;
-  agents: { icon: string; name: string }[];
-  statusText?: string;
-  duration?: number;
-  createdAt: string;
-}
+import type { Pool } from '@mindpool/shared';
 
 function timeGroup(dateStr: string): string {
   const d = new Date(dateStr);
@@ -25,13 +16,11 @@ function timeGroup(dateStr: string): string {
 
 export function HistoryScreen() {
   const { navigateToMeeting } = useAppStore();
-  const { data: queryPools = [] } = usePools();
-
-  // Cast since UI expects extra optional props temporarily
-  const pools = queryPools as unknown as PoolCard[];
+  const { data: poolData, hasNextPage, fetchNextPage, isFetchingNextPage } = usePools();
+  const pools = poolData?.items ?? [];
 
   // Group by time
-  const grouped: Record<string, PoolCard[]> = {};
+  const grouped: Record<string, Pool[]> = {};
   const order = ['Live', 'This Week', 'Last Month', 'Older'];
   pools.forEach((p) => {
     const group = p.status === 'active' ? 'Live' : timeGroup(p.createdAt);
@@ -95,6 +84,18 @@ export function HistoryScreen() {
               </div>
             </div>
           ),
+      )}
+
+      {hasNextPage && (
+        <div className="flex justify-center mb-7">
+          <button
+            onClick={() => fetchNextPage()}
+            disabled={isFetchingNextPage}
+            className="px-4 py-2 text-sm text-text-muted border border-border rounded hover:bg-surface-2 transition-colors disabled:opacity-50"
+          >
+            {isFetchingNextPage ? 'Loading...' : 'Load more'}
+          </button>
+        </div>
       )}
 
       {totalPools === 0 && (

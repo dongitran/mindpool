@@ -23,3 +23,19 @@ export function validate(schema: ZodSchema) {
     }
   };
 }
+
+const OBJECT_ID_RE = /^[a-fA-F0-9]{24}$/;
+
+/** Validate that :id or :poolId param is a valid MongoDB ObjectId */
+export function validateObjectId(paramName = 'id') {
+  return (req: Request, res: Response, next: NextFunction) => {
+    const value = req.params[paramName] as string | undefined;
+    if (!value || !OBJECT_ID_RE.test(value)) {
+      res.status(400).json({
+        error: { message: `Invalid ${paramName}: must be a 24-character hex string` },
+      });
+      return;
+    }
+    next();
+  };
+}

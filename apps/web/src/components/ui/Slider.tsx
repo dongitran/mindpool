@@ -31,7 +31,11 @@ export function Slider({
         className="flex-1 appearance-none h-[3px] rounded bg-[var(--border-light)] outline-none cursor-pointer
           [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-3.5 [&::-webkit-slider-thumb]:h-3.5
           [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-accent
-          [&::-webkit-slider-thumb]:cursor-pointer [&::-webkit-slider-thumb]:shadow-[0_0_6px_rgba(61,255,192,0.4)]"
+          [&::-webkit-slider-thumb]:cursor-pointer [&::-webkit-slider-thumb]:shadow-[0_0_6px_rgba(61,255,192,0.4)]
+          [&::-moz-range-thumb]:appearance-none [&::-moz-range-thumb]:w-3.5 [&::-moz-range-thumb]:h-3.5
+          [&::-moz-range-thumb]:rounded-full [&::-moz-range-thumb]:bg-accent [&::-moz-range-thumb]:border-0
+          [&::-moz-range-thumb]:cursor-pointer [&::-moz-range-thumb]:shadow-[0_0_6px_rgba(61,255,192,0.4)]
+          [&::-moz-range-track]:bg-[var(--border-light)] [&::-moz-range-track]:h-[3px] [&::-moz-range-track]:rounded"
       />
       {labelMax && (
         <span className="text-[11px] text-text-muted">{labelMax}</span>

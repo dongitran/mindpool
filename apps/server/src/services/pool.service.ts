@@ -1,6 +1,7 @@
 import type { AgentState, Pool as SharedPool } from '@mindpool/shared';
 import type { Model } from 'mongoose';
 import type { PoolDocument, AgentDocument, MessageDocument } from '../models';
+import { parseCursorFilter, buildCursor } from '../lib/pagination';
 
 export function mapPoolDocToShared(doc: PoolDocument): SharedPool {
   return {
@@ -92,8 +93,17 @@ export function buildPoolService({
       return Pool.findById(id).populate('messages');
     },
 
-    async listPools() {
-      return Pool.find().sort({ updatedAt: -1 });
+    async listPools(opts?: { limit?: number; cursor?: string }) {
+      const limit = opts?.limit ?? 20;
+      const filter = parseCursorFilter(opts?.cursor);
+      const items = await Pool.find(filter).sort({ updatedAt: -1, _id: -1 }).limit(limit + 1);
+      const hasMore = items.length > limit;
+      if (hasMore) items.pop();
+      const last = items[items.length - 1];
+      return {
+        items,
+        nextCursor: hasMore && last ? buildCursor(last) : null,
+      };
     },
 
     async updatePoolStatus(
