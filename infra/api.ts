@@ -40,6 +40,7 @@ export function createApiDeployment(
                                     { name: "LLM_RELEVANCE_CHECK_MODEL", value: config.get("llmRelevanceCheckModel") ?? "kimi-k2.5" },
                                     { name: "LLM_RECAP_SYNTHESIS_PROVIDER", value: config.get("llmRecapSynthesisProvider") ?? "kimi" },
                                     { name: "LLM_RECAP_SYNTHESIS_MODEL", value: config.get("llmRecapSynthesisModel") ?? "kimi-k2.5" },
+                                    { name: "MINDPOOL_HOST", value: config.require("host") },
                                 ],
                                 resources: {
                                     requests: { cpu: "100m", memory: "256Mi" },
