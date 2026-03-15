@@ -76,14 +76,29 @@ router.get('/:poolId', async (req: Request<{ poolId: string }>, res: Response) =
       : Message.find({ poolId });
 
   try {
+    // Fetch pool FIRST to build agent metadata map for message enrichment
+    const pool = await Pool.findById(poolId);
+    const agentMeta = new Map<string, { name: string; icon: string; role: string }>();
+    if (pool) {
+      for (const agent of pool.agents) {
+        agentMeta.set(agent.agentId, { name: agent.name, icon: agent.icon, role: agent.role });
+      }
+    }
+
     const messages = await query.sort({ timestamp: 1 });
     for (const msg of messages) {
-      // Send the actual message timestamp as the id so reconnects skip this exact message
-      res.write(`id: ${msg.timestamp.toISOString()}\ndata: ${JSON.stringify({ type: 'message', message: msg })}\n\n`);
+      // Enrich with agent metadata so replayed messages include name/icon/role
+      const enriched = { ...msg.toObject(), } as Record<string, unknown>;
+      const meta = agentMeta.get(msg.agentId);
+      if (meta) {
+        enriched.agentName = meta.name;
+        enriched.icon = meta.icon;
+        enriched.role = meta.role;
+      }
+      res.write(`id: ${msg.timestamp.toISOString()}\ndata: ${JSON.stringify({ type: 'message', message: enriched })}\n\n`);
     }
 
     // Send current agent states and queue so late-joining clients see correct state
-    const pool = await Pool.findById(poolId);
     if (pool) {
       for (const agent of pool.agents) {
         if (agent.state === 'speaking') {

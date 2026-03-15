@@ -50,9 +50,12 @@ export function useSSE(poolId: string | null) {
                   addMessage({
                     type: 'agent',
                     agentId: msg.agentId,
-                    // Note: name/icon might be missing in history if DB schema doesn't store it, 
-                    // but AgentsPanel info usually covers it. For now, we restore content.
+                    agentName: msg.agentName,
+                    icon: msg.icon,
+                    role: msg.role,
                     content: msg.content,
+                    thinking: msg.thinking,
+                    thinkSec: msg.thinkSec,
                     timestamp: msg.timestamp,
                     skipStream: true,
                   });
