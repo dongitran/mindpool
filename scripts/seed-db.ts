@@ -1,9 +1,7 @@
 import mongoose from 'mongoose';
-import dotenv from 'dotenv';
 
-dotenv.config();
-
-const MONGODB_URI = process.env.MONGODB_URI || 'mongodb://localhost:27017/mindpool';
+const MONGODB_URI = process.env.MONGO_URI || process.env.MONGODB_URI || 'mongodb://localhost:27017/mindpool';
+const SEED_MODE = process.env.SEED_MODE || 'upsert';
 
 const BUILT_IN_AGENTS = [
   { name: 'MindX', icon: '🧠', specialty: 'Điều phối, không có domain', systemPrompt: 'You are MindX, the orchestrator of Mindpool discussions. You do not have domain expertise. Your role is to: 1) Analyze topics and suggest relevant agents, 2) Choose the best opening agent, 3) Manage the raise-hand queue, 4) Monitor stop signals, 5) Generate wrap-up summaries. Never give domain opinions — only facilitate.', personality: { directness: 0.5, creativity: 0.5, skepticism: 0.3 }, signatureQuestion: '', isCustom: false },
@@ -19,97 +17,73 @@ const BUILT_IN_AGENTS = [
   { name: "Devil's Advocate", icon: '😈', specialty: 'Challenge mọi assumption', systemPrompt: "You are the Devil's Advocate. Your job is to challenge every assumption, find weaknesses in arguments, and stress-test ideas. Always ask: 'Tại sao cái này sẽ fail?' Be constructively critical.", personality: { directness: 1.0, creativity: 0.6, skepticism: 1.0 }, signatureQuestion: 'Tại sao cái này sẽ fail?', isCustom: false },
 ];
 
+const DEFAULT_SETTINGS = {
+  userId: 'default',
+  defaultModel: 'kimi-k2',
+  thinkingBudget: 10,
+  autoStartDiscussion: true,
+  showThinkingDefault: false,
+  mindxEnabled: true,
+  autoRecap: true,
+  maxAgentsPerPool: 6,
+  compactSidebar: false,
+  accentColor: '#3dffc0',
+  apiKeys: {},
+};
+
+async function upsert() {
+  const db = mongoose.connection.db!;
+  const agentsCol = db.collection('agents');
+  const settingsCol = db.collection('settings');
+
+  // Upsert agents by name — idempotent
+  const result = await agentsCol.bulkWrite(
+    BUILT_IN_AGENTS.map((agent) => ({
+      updateOne: {
+        filter: { name: agent.name },
+        update: { $set: agent },
+        upsert: true,
+      },
+    }))
+  );
+  console.log(`Agents: ${result.upsertedCount} inserted, ${result.modifiedCount} updated, ${result.matchedCount} matched`);
+
+  // Upsert default settings
+  await settingsCol.updateOne(
+    { userId: 'default' },
+    { $set: { ...DEFAULT_SETTINGS, updatedAt: new Date() }, $setOnInsert: { createdAt: new Date() } },
+    { upsert: true }
+  );
+  console.log('Settings: upserted default');
+
+  const total = await agentsCol.countDocuments();
+  console.log(`Total agents in DB: ${total}`);
+}
+
+async function clear() {
+  const db = mongoose.connection.db!;
+  const agentsResult = await db.collection('agents').deleteMany({});
+  const settingsResult = await db.collection('settings').deleteMany({});
+  console.log(`Cleared: ${agentsResult.deletedCount} agents, ${settingsResult.deletedCount} settings`);
+}
+
 async function seed() {
+  console.log(`Mode: ${SEED_MODE}`);
+  console.log(`Connecting to MongoDB...`);
   await mongoose.connect(MONGODB_URI);
-  console.log('Connected to MongoDB');
+  console.log('Connected');
 
-  // Clear existing data
-  const db = mongoose.connection.db;
-  if (!db) throw new Error('No database connection');
-  const collections = await db.listCollections().toArray();
-  for (const col of collections) {
-    await db.dropCollection(col.name);
+  if (SEED_MODE === 'clear') {
+    await clear();
+  } else {
+    await upsert();
   }
-  console.log('Cleared existing data');
 
-  // Create agents collection and insert
-  const agentsCollection = db.collection('agents');
-  const insertedAgents = await agentsCollection.insertMany(BUILT_IN_AGENTS);
-  const agentIds = Object.values(insertedAgents.insertedIds);
-  console.log(`Seeded ${agentIds.length} agents`);
-
-  // Create default settings
-  const settingsCollection = db.collection('settings');
-  await settingsCollection.insertOne({
-    userId: 'default',
-    defaultModel: 'kimi-k2',
-    thinkingBudget: 10,
-    autoStartDiscussion: true,
-    showThinkingDefault: false,
-    mindxEnabled: true,
-    autoRecap: true,
-    maxAgentsPerPool: 6,
-    compactSidebar: false,
-    accentColor: '#3dffc0',
-    apiKeys: {},
-    createdAt: new Date(),
-    updatedAt: new Date(),
-  });
-  console.log('Seeded default settings');
-
-  // Seed 2 demo pools (completed) so History screen has content on fresh install
-  const poolsCollection = db.collection('pools');
-  const twoWeeksAgo = new Date(Date.now() - 14 * 24 * 60 * 60 * 1000);
-  const threeDaysAgo = new Date(Date.now() - 3 * 24 * 60 * 60 * 1000);
-
-  await poolsCollection.insertMany([
-    {
-      title: 'Nên build mobile app hay web app trước?',
-      topic: 'Chiến lược phát triển sản phẩm: mobile-first hay web-first cho startup early-stage',
-      status: 'completed',
-      agents: [
-        { agentId: agentIds[1].toString(), icon: '💼', name: 'Business Strategist', role: 'Chiến lược kinh doanh', state: 'listening', queuePosition: null },
-        { agentId: agentIds[2].toString(), icon: '👨‍💻', name: 'Software Engineer', role: 'Kỹ thuật & khả thi', state: 'listening', queuePosition: null },
-        { agentId: agentIds[3].toString(), icon: '🎨', name: 'UX Designer', role: 'Trải nghiệm người dùng', state: 'listening', queuePosition: null },
-        { agentId: agentIds[9].toString(), icon: '📈', name: 'Market Analyst', role: 'Phân tích thị trường', state: 'listening', queuePosition: null },
-      ],
-      messages: [],
-      queue: [],
-      statusText: 'Đã kết thúc',
-      duration: '8 phút',
-      sendAgents: [],
-      mapCenter: 'Mobile vs Web',
-      mapCenterSub: 'Chiến lược ra mắt',
-      mapNodes: [],
-      createdAt: twoWeeksAgo,
-      updatedAt: twoWeeksAgo,
-    },
-    {
-      title: 'Pricing strategy cho SaaS B2B',
-      topic: 'Xác định mô hình pricing phù hợp cho sản phẩm SaaS B2B giai đoạn early-stage',
-      status: 'completed',
-      agents: [
-        { agentId: agentIds[1].toString(), icon: '💼', name: 'Business Strategist', role: 'Chiến lược kinh doanh', state: 'listening', queuePosition: null },
-        { agentId: agentIds[5].toString(), icon: '📊', name: 'Data Scientist', role: 'Dữ liệu & số liệu', state: 'listening', queuePosition: null },
-        { agentId: agentIds[7].toString(), icon: '✨', name: 'Creative Director', role: 'Thương hiệu & câu chuyện', state: 'listening', queuePosition: null },
-        { agentId: agentIds[10].toString(), icon: '😈', name: "Devil's Advocate", role: 'Phản biện', state: 'listening', queuePosition: null },
-      ],
-      messages: [],
-      queue: [],
-      statusText: 'Đã kết thúc',
-      duration: '12 phút',
-      sendAgents: [],
-      mapCenter: 'SaaS Pricing',
-      mapCenterSub: 'B2B Early-stage',
-      mapNodes: [],
-      createdAt: threeDaysAgo,
-      updatedAt: threeDaysAgo,
-    },
-  ]);
-  console.log('Seeded 2 demo pools');
-
-  console.log('Seed complete!');
+  console.log('Done!');
   await mongoose.disconnect();
 }
 
-seed().catch(console.error);
+seed().catch((err) => {
+  console.error('Seed failed:', err);
+  process.exit(1);
+});

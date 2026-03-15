@@ -1,0 +1,53 @@
+name: Seed Database
+
+on:
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: 'upsert = insert/update agents idempotently, clear = remove all agents+settings'
+        required: true
+        type: choice
+        options:
+          - upsert
+          - clear
+        default: upsert
+
+jobs:
+  seed:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Auth to GCP
+        uses: google-github-actions/auth@v2
+        with:
+          credentials_json: ${{ secrets.GCP_INFRA_CREDENTIALS }}
+
+      - name: Set up Cloud SDK
+        uses: google-github-actions/setup-gcloud@v2
+        with:
+          version: '557.0.0'
+
+      - name: Install gke-gcloud-auth-plugin
+        run: gcloud components install gke-gcloud-auth-plugin --quiet
+
+      - name: Get GKE credentials
+        run: |
+          gcloud container clusters get-credentials gcp-infra \
+            --zone asia-southeast1-a \
+            --project ${{ secrets.GCP_INFRA_PROJECT_ID }}
+
+      - name: Compile seed script
+        run: npx esbuild scripts/seed-db.ts --bundle --platform=node --target=node20 --external:mongoose --format=cjs --outfile=/tmp/seed-db.js
+
+      - name: Run seed on API pod
+        run: |
+          POD=$(kubectl -n mindpool get pod -l app=api -o jsonpath='{.items[0].metadata.name}')
+          echo "Target pod: $POD"
+          echo "Mode: ${{ inputs.mode }}"
+          kubectl -n mindpool cp /tmp/seed-db.js $POD:/tmp/seed-db.js
+          kubectl -n mindpool exec $POD -- env SEED_MODE="${{ inputs.mode }}" node /tmp/seed-db.js
