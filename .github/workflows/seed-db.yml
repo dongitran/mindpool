@@ -50,4 +50,4 @@ jobs:
           echo "Target pod: $POD"
           echo "Mode: ${{ inputs.mode }}"
           kubectl -n mindpool cp /tmp/seed-db.js $POD:/tmp/seed-db.js
-          kubectl -n mindpool exec $POD -- env SEED_MODE="${{ inputs.mode }}" node /tmp/seed-db.js
+          kubectl -n mindpool exec $POD -- sh -c 'cd /app && SEED_MODE="${{ inputs.mode }}" node /tmp/seed-db.js'
