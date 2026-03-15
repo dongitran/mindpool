@@ -284,4 +284,62 @@ test.describe('Full Meeting E2E Flow', () => {
 
     console.log(`[Meeting E2E] All assertions passed. ${messages.length} total messages.`);
   });
+
+  // ── 7. Agent names persist after page reload (avatar reset bug) ─────────
+  test('7. Agent names should persist after page reload — not reset to MindX', async ({ page, request }) => {
+    test.setTimeout(60_000);
+
+    // 7a. Lấy pool data để biết expected agent names
+    const res = await request.get(`/api/pool/${poolId}`);
+    expect(res.ok()).toBeTruthy();
+    const poolData = (await res.json()) as Record<string, unknown>;
+    const poolAgents = poolData.agents as Array<{ agentId: string; name: string; icon: string }>;
+    const poolTitle = (poolData.title || poolData.topic) as string;
+
+    // Lọc agent messages (không phải mindx, không phải user)
+    const allMessages = poolData.messages as Array<{ agentId: string }>;
+    const agentMessages = allMessages.filter((m) => m.agentId !== 'mindx' && m.agentId !== 'user');
+    expect(agentMessages.length, 'Meeting should have agent messages to verify').toBeGreaterThan(0);
+
+    // 7b. Mở lại app trên browser (giống user F5 reload)
+    await page.goto('/');
+
+    // 7c. Click vào completed meeting trong sidebar
+    const meetingItem = page.getByText(poolTitle).first();
+    await expect(meetingItem).toBeVisible({ timeout: 10_000 });
+    await meetingItem.click();
+
+    // 7d. Đợi SSE replay load tất cả messages từ DB lên UI
+    await page.waitForTimeout(5_000);
+    await page.screenshot({ path: 'screenshots/7-replay-agent-names.png', fullPage: true });
+
+    // 7e. Quét discussion feed — đếm tên agent đúng vs "MindX"
+    const expectedAgentNames = new Set(poolAgents.map((a) => a.name));
+    const messageBlocks = page.locator('.animate-msg-in');
+    const totalBlocks = await messageBlocks.count();
+
+    let nonMindxAgentNameCount = 0;
+    for (let i = 0; i < totalBlocks; i++) {
+      const block = messageBlocks.nth(i);
+      const nameLabel = block.locator('.font-semibold').first();
+      if ((await nameLabel.count()) === 0) continue; // user messages không có name label
+      const text = (await nameLabel.textContent())?.trim();
+      if (text && text !== 'MindX' && expectedAgentNames.has(text)) {
+        nonMindxAgentNameCount++;
+      }
+    }
+
+    console.log(
+      `[Meeting E2E] Avatar check: ${nonMindxAgentNameCount} correct agent names found, ` +
+        `${agentMessages.length} agent messages expected`,
+    );
+
+    // 7f. Assert — sẽ FAIL vì bug: tất cả tên bị reset về "MindX" sau reload
+    // nonMindxAgentNameCount = 0 nhưng agentMessages.length >= 2
+    expect(
+      nonMindxAgentNameCount,
+      `Expected ${agentMessages.length} agent names after reload, found ${nonMindxAgentNameCount}. ` +
+        'Bug: agent names are resetting to "MindX" when replaying completed meeting from DB.',
+    ).toBeGreaterThanOrEqual(agentMessages.length);
+  });
 });
